@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CopilotSettings, updateSetting, useSettingsValue } from "@/settings/model";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useTab } from "@/contexts/TabContext";
 
 type CharacterTrait = Record<string, string>;
 type SelectedValues = Record<string, string | undefined>;
@@ -305,6 +306,7 @@ const DynamicTraitEditor: React.FC<DynamicTraitEditorProps> = ({
   updateSystemPrompts,
   selectedValues, // 直接使用从 props 传入的值
 }) => {
+  const { modalContainer } = useTab();
   const settings = useSettingsValue();
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
@@ -409,7 +411,7 @@ const DynamicTraitEditor: React.FC<DynamicTraitEditorProps> = ({
       open={dialogState.isOpen}
       onOpenChange={(open) => setDialogState((prev) => ({ ...prev, isOpen: open }))}
     >
-      <DialogContent>
+      <DialogContent container={modalContainer}>
         <DialogHeader>
           <DialogTitle>
             {dialogState.mode === "add"
