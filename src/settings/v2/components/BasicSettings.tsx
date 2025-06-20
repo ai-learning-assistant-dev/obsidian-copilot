@@ -16,6 +16,7 @@ import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/comp
 import { createPlusPageUrl } from "@/plusUtils";
 import { getModelDisplayWithIcons } from "@/components/ui/model-display";
 import VectorStoreManager from "@/search/vectorStoreManager";
+import { t } from "@/lang/helper";
 
 const ChainType2Label: Record<ChainType, string> = {
   [ChainType.LLM_CHAIN]: "Chat",
@@ -110,11 +111,11 @@ export const BasicSettings: React.FC = () => {
             {/* API Key Section */}
             <SettingItem
               type="custom"
-              title="API Keys"
+              title={t("API Keys")}
               description={
                 <div className="flex items-center gap-1.5">
                   <span className="leading-none">
-                    Configure API keys for different AI providers
+                    {t("Configure API keys for different AI providers")}
                   </span>
                   <TooltipProvider delayDuration={0}>
                     <Tooltip>
@@ -123,11 +124,12 @@ export const BasicSettings: React.FC = () => {
                       </TooltipTrigger>
                       <TooltipContent className="max-w-96 flex flex-col gap-2 py-4">
                         <div className="text-sm font-medium text-accent">
-                          API key required for chat and QA features
+                          {t("API key required for chat and QA features")}
                         </div>
                         <div className="text-xs text-muted">
-                          To enable chat and QA functionality, please provide an API key from your
-                          selected provider.
+                          {t(
+                            "To enable chat and QA functionality, please provide an API key from your selected provider."
+                          )}
                         </div>
                       </TooltipContent>
                     </Tooltip>
@@ -140,7 +142,7 @@ export const BasicSettings: React.FC = () => {
                 variant="secondary"
                 className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-start"
               >
-                Set Keys
+                {t("Set Keys")}
                 <Key className="h-4 w-4" />
               </Button>
             </SettingItem>
@@ -156,8 +158,8 @@ export const BasicSettings: React.FC = () => {
           </div>
           <SettingItem
             type="select"
-            title="Default Chat Model"
-            description="Select the Chat model to use"
+            title={t("Default Chat Model")}
+            description={t("Select the Chat model to use")}
             value={defaultModelActivated ? settings.defaultModelKey : "Select Model"}
             onChange={(value) => {
               const selectedModel = settings.activeModels.find(
@@ -177,12 +179,12 @@ export const BasicSettings: React.FC = () => {
                 ? enableActivatedModels
                 : [{ label: "Select Model", value: "Select Model" }, ...enableActivatedModels]
             }
-            placeholder="Model"
+            placeholder={t("Model")}
           />
 
           <SettingItem
             type="select"
-            title="Embedding Model"
+            title={t("Embedding Model")}
             description={
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
