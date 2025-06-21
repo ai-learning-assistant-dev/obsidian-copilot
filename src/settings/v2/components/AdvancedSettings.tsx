@@ -1,6 +1,7 @@
 import { SettingItem } from "@/components/ui/setting-item";
 import { updateSetting, useSettingsValue } from "@/settings/model";
 import React from "react";
+import { t } from "@/lang/helper";
 
 export const AdvancedSettings: React.FC = () => {
   const settings = useSettingsValue();
@@ -11,18 +12,22 @@ export const AdvancedSettings: React.FC = () => {
       <section>
         <SettingItem
           type="textarea"
-          title="User System Prompt"
-          description="Customize the system prompt for all messages, may result in unexpected behavior!"
+          title={t("User System Prompt")}
+          description={t(
+            "Customize the system prompt for all messages, may result in unexpected behavior!"
+          )}
           value={settings.userSystemPrompt}
           onChange={(value) => updateSetting("userSystemPrompt", value)}
-          placeholder="Enter your system prompt here..."
+          placeholder={t("Enter your system prompt here...")}
         />
 
         <div className="space-y-4">
           <SettingItem
             type="switch"
-            title="Custom Prompt Templating"
-            description="Enable templating to process variables like {activenote}, {foldername} or {#tag} in prompts. Disable to use raw prompts without any processing."
+            title={t("Custom Prompt Templating")}
+            description={t(
+              "Enable templating to process variables like {activenote}, {foldername} or {#tag} in prompts. Disable to use raw prompts without any processing."
+            )}
             checked={settings.enableCustomPromptTemplating}
             onCheckedChange={(checked) => {
               updateSetting("enableCustomPromptTemplating", checked);
@@ -31,8 +36,10 @@ export const AdvancedSettings: React.FC = () => {
 
           <SettingItem
             type="switch"
-            title="Images in Markdown (Plus)"
-            description="Pass embedded images in markdown to the AI along with the text. Only works with multimodal models (plus only)."
+            title={t("Images in Markdown (Plus)")}
+            description={t(
+              "Pass embedded images in markdown to the AI along with the text. Only works with multimodal models (plus only)."
+            )}
             checked={settings.passMarkdownImages}
             onCheckedChange={(checked) => {
               updateSetting("passMarkdownImages", checked);
@@ -41,8 +48,8 @@ export const AdvancedSettings: React.FC = () => {
 
           <SettingItem
             type="switch"
-            title="Enable Encryption"
-            description="Enable encryption for the API keys."
+            title={t("Enable Encryption")}
+            description={t("Enable encryption for the API keys.")}
             checked={settings.enableEncryption}
             onCheckedChange={(checked) => {
               updateSetting("enableEncryption", checked);
@@ -51,8 +58,8 @@ export const AdvancedSettings: React.FC = () => {
 
           <SettingItem
             type="switch"
-            title="Debug Mode"
-            description="Debug mode will log some debug message to the console."
+            title={t("Debug Mode")}
+            description={t("Debug mode will log some debug message to the console.")}
             checked={settings.debug}
             onCheckedChange={(checked) => {
               updateSetting("debug", checked);

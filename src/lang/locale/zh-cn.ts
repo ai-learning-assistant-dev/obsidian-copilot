@@ -21,4 +21,19 @@ export default {
   "Set Keys": "设置密钥",
   "To enable chat and QA functionality, please provide an API key from your selected provider.":
     "要启用聊天和问答功能，请从您选择的提供商处获取并配置API密钥。",
+  // AdvancedSettings.tsx
+  "User System Prompt": "用户系统提示词",
+  "Customize the system prompt for all messages, may result in unexpected behavior!":
+    "自定义所有消息的系统提示，可能导致意外行为！",
+  "Enter your system prompt here...": "在此输入您的系统提示词...",
+  "Custom Prompt Templating": "自定义提示模板",
+  "Enable templating to process variables like {activenote}, {foldername} or {#tag} in prompts. Disable to use raw prompts without any processing.":
+    "启用模板功能以处理提示中的变量，如 {activenote}、{foldername} 或 {#tag}。禁用则使用原始提示，不进行任何处理。",
+  "Images in Markdown (Plus)": "Markdown 中的图片 (Plus)",
+  "Pass embedded images in markdown to the AI along with the text. Only works with multimodal models (plus only).":
+    "将 Markdown 中的嵌入图片与文本一起传递给 AI。仅适用于多模态模型（仅限 Plus）。",
+  "Enable Encryption": "启用加密",
+  "Enable encryption for the API keys.": "为 API 密钥启用加密。",
+  "Debug Mode": "调试模式",
+  "Debug mode will log some debug message to the console.": "调试模式会将调试信息记录到控制台。",
 };
