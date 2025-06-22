@@ -36,4 +36,37 @@ export default {
   "Enable encryption for the API keys.": "为 API 密钥启用加密。",
   "Debug Mode": "调试模式",
   "Debug mode will log some debug message to the console.": "调试模式会将调试信息记录到控制台。",
+  // Chat
+  // ChatInput.tsx
+  "Drop images here...": "拖拽图片到这里...",
+  "Generating...": "生成中...",
+  "Model Load Failed": "模型加载失败",
+  "Select Model": "选择模型",
+  "Model switch failed: ": "模型切换失败: ",
+  Stop: "停止",
+  "Ask anything. [[ for notes. / for custom prompts.":
+    "输入任意问题。[[ 查找笔记。/ 使用自定义提示词。",
+  // ChatButtons.tsx
+  Edit: "编辑",
+  Delete: "删除",
+  "Show Sources": "显示来源",
+  "Insert / Replace at cursor": "插入/替换到光标位置",
+  Copy: "复制",
+  Regenerate: "重新生成",
+  // ChatControls.tsx
+  // refreshVaultIndex()
+  "Vault index refreshed.": "知识库索引已刷新",
+  "Error refreshing vault index:": "刷新知识库索引时出错：",
+  "Failed to refresh vault index. Check console for details.":
+    "刷新知识库索引失败，请查看控制台获取详情",
+  //
+  "New Chat": "新建对话",
+  "Save Chat as Note": "保存对话为笔记",
+  "Suggested Prompt": "推荐提示词",
+  "Relevant Note": "相关笔记",
+  "Refresh Vault Index": "刷新知识库索引",
+  "Advanced Settings": "高级设置",
+  // ChatContextMenu.tsx
+  "Remove from context": "从上下文中移除",
+  "Add context": "添加上下文",
 };

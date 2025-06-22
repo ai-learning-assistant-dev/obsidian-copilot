@@ -3,6 +3,7 @@ import { TFile } from "obsidian";
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { t } from "@/lang/helper";
 
 interface ChatContextMenuProps {
   activeNote: TFile | null;
@@ -33,7 +34,7 @@ function ContextNote({
         variant="ghost2"
         size="fit"
         onClick={() => onRemoveContext(note.path)}
-        aria-label="Remove from context"
+        aria-label={t("Remove from context")}
       >
         <X className="size-4" />
       </Button>
@@ -52,7 +53,7 @@ function ContextUrl({ url, onRemoveUrl }: { url: string; onRemoveUrl: (url: stri
         variant="ghost2"
         size="fit"
         onClick={() => onRemoveUrl(url)}
-        aria-label="Remove from context"
+        aria-label={t("Remove from context")}
       >
         <X className="size-4" />
       </Button>
@@ -96,7 +97,7 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
           className="border border-border border-solid rounded-sm ml-1"
         >
           <Plus className="size-4" />
-          {!hasContext && <span className="text-xs leading-4 pr-1">Add context</span>}
+          {!hasContext && <span className="text-xs leading-4 pr-1">{t("Add context")}</span>}
         </Button>
       </div>
       <div className="flex gap-1 flex-wrap flex-1">

@@ -37,4 +37,37 @@ export default {
   "Debug Mode": "Debug Mode",
   "Debug mode will log some debug message to the console.":
     "Debug mode will log some debug message to the console.",
+  // Chat
+  // ChatInput.tsx
+  "Drop images here...": "Drop images here...",
+  "Generating...": "Generating...",
+  "Model Load Failed": "Model Load Failed",
+  "Select Model": "Select Model",
+  "Model switch failed: ": "Model switch failed: ",
+  Stop: "Stop",
+  "Ask anything. [[ for notes. / for custom prompts.":
+    "Ask anything. [[ for notes. / for custom prompts.",
+  // ChatButtons.tsx
+  Edit: "Edit",
+  Delete: "Delete",
+  "Show Sources": "Show Sources",
+  "Insert / Replace at cursor": "Insert / Replace at cursor",
+  Copy: "Copy",
+  Regenerate: "Regenerate",
+  // ChatControls.tsx
+  // refreshVaultIndex()
+  "Vault index refreshed.": "Vault index refreshed.",
+  "Error refreshing vault index:": "Error refreshing vault index:",
+  "Failed to refresh vault index. Check console for details.":
+    "Failed to refresh vault index. Check console for details.",
+  //
+  "New Chat": "New Chat",
+  "Save Chat as Note": "Save Chat as Note",
+  "Suggested Prompt": "Suggested Prompt",
+  "Relevant Note": "Relevant Note",
+  "Refresh Vault Index": "Refresh Vault Index",
+  "Advanced Settings": "Advanced Settings",
+  // ChatContextMenu.tsx
+  "Remove from context": "Remove from context",
+  "Add context": "Add context",
 };
