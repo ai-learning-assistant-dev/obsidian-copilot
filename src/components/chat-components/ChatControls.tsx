@@ -21,14 +21,15 @@ import { Notice } from "obsidian";
 import VectorStoreManager from "@/search/vectorStoreManager";
 import { navigateToPlusPage, useIsPlusUser } from "@/plusUtils";
 import { PLUS_UTM_MEDIUMS } from "@/constants";
+import { t } from "@/lang/helper";
 
 export async function refreshVaultIndex() {
   try {
     await VectorStoreManager.getInstance().indexVaultToVectorStore();
-    new Notice("Vault index refreshed.");
+    new Notice(t("Vault index refreshed."));
   } catch (error) {
-    console.error("Error refreshing vault index:", error);
-    new Notice("Failed to refresh vault index. Check console for details.");
+    console.error(t("Error refreshing vault index:"), error);
+    new Notice(t("Failed to refresh vault index. Check console for details."));
   }
 }
 
@@ -129,24 +130,29 @@ export function ChatControls({ onNewChat, onSaveAsNote }: ChatControlsProps) {
       <div>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost2" size="icon" title="New Chat" onClick={onNewChat}>
+            <Button variant="ghost2" size="icon" title={t("New Chat")} onClick={onNewChat}>
               <MessageCirclePlus className="size-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>New Chat</TooltipContent>
+          <TooltipContent>{t("New Chat")}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost2" size="icon" title="Save Chat as Note" onClick={onSaveAsNote}>
+            <Button
+              variant="ghost2"
+              size="icon"
+              title={t("Save Chat as Note")}
+              onClick={onSaveAsNote}
+            >
               <Download className="size-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Save Chat as Note</TooltipContent>
+          <TooltipContent>{t("Save Chat as Note")}</TooltipContent>
         </Tooltip>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost2" size="icon" title="Advanced Settings">
+            <Button variant="ghost2" size="icon" title={t("Advanced Settings")}>
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -160,7 +166,7 @@ export function ChatControls({ onNewChat, onSaveAsNote }: ChatControlsProps) {
             >
               <div className="flex items-center gap-2">
                 <Sparkles className="size-4" />
-                Suggested Prompt
+                {t("Suggested Prompt")}
               </div>
               <SettingSwitch checked={settings.showSuggestedPrompts} />
             </DropdownMenuItem>
@@ -173,7 +179,7 @@ export function ChatControls({ onNewChat, onSaveAsNote }: ChatControlsProps) {
             >
               <div className="flex items-center gap-2">
                 <FileText className="size-4" />
-                Relevant Note
+                {t("Relevant Note")}
               </div>
               <SettingSwitch checked={settings.showRelevantNotes} />
             </DropdownMenuItem>
@@ -182,7 +188,7 @@ export function ChatControls({ onNewChat, onSaveAsNote }: ChatControlsProps) {
               onSelect={() => refreshVaultIndex()}
             >
               <RefreshCw className="size-4" />
-              Refresh Vault Index
+              {t("Refresh Vault Index")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

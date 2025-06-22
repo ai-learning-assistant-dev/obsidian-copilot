@@ -7,6 +7,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import SettingsMainV2 from "@/settings/v2/SettingsMainV2";
 import { ContainerContext } from "@/settings/v2/components/ContainerContext";
+import { t } from "@/lang/helper";
 
 export class CopilotSettingTab extends PluginSettingTab {
   plugin: CopilotPlugin;
@@ -31,10 +32,10 @@ export class CopilotSettingTab extends PluginSettingTab {
       await app.plugins.enablePlugin("copilot");
 
       app.setting.openTabById("copilot").display();
-      new Notice("Plugin reloaded successfully.");
+      new Notice(t("Plugin reloaded successfully."));
     } catch (error) {
-      new Notice("Failed to reload the plugin. Please reload manually.");
-      console.error("Error reloading plugin:", error);
+      new Notice(t("Failed to reload the plugin. Please reload manually."));
+      console.error(t("Error reloading plugin:"), error);
     }
   }
 

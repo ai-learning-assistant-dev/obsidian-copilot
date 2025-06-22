@@ -13,6 +13,8 @@ import { BasicSettings } from "./components/BasicSettings";
 import { ModelSettings } from "./components/ModelSettings";
 import { QASettings } from "./components/QASettings";
 import { SystemPromptsSection } from "./components/SystemPromptsSection";
+import { moment } from "obsidian";
+import { t } from "@/lang/helper";
 
 const TAB_IDS = ["basic", "model", "QA", "command", "advanced", "systemPrompts"] as const;
 type TabId = (typeof TAB_IDS)[number];
@@ -37,11 +39,25 @@ const components: Record<TabId, React.FC> = {
   systemPrompts: () => <SystemPromptsSection />,
 };
 
-// tabs
+// 中文标签映射
+const TAB_LABELS_CHINESE: Record<TabId, string> = {
+  basic: "基础设置",
+  model: "模型设置",
+  QA: "问答设置",
+  command: "命令设置",
+  advanced: "高级设置",
+  systemPrompts: "系统提示词",
+};
+
+// 获取当前语言
+const currentLanguage = moment.locale();
+const isChinese = currentLanguage.startsWith("zh");
+
+// tabs - 根据语言动态设置标签
 const tabs: TabItemType[] = TAB_IDS.map((id) => ({
   id,
   icon: icons[id],
-  label: id.charAt(0).toUpperCase() + id.slice(1),
+  label: isChinese ? TAB_LABELS_CHINESE[id] : id.charAt(0).toUpperCase() + id.slice(1),
 }));
 
 const SettingsContent: React.FC<{ plugin: CopilotPlugin }> = ({ plugin }) => {
@@ -101,7 +117,7 @@ const SettingsMainV2: React.FC<SettingsMainV2Props> = ({ plugin }) => {
         <div className="flex flex-col gap-2">
           <h1 className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span>Copilot Settings</span>
+              <span>{t("Copilot Settings")}</span>
               <div className="flex items-center gap-1">
                 <span className="text-xs text-muted">v{plugin.manifest.version}</span>
                 {latestVersion && (
@@ -113,10 +129,11 @@ const SettingsMainV2: React.FC<SettingsMainV2Props> = ({ plugin }) => {
                         rel="noopener noreferrer"
                         className="text-xs text-accent hover:underline"
                       >
-                        (Update to v{latestVersion})
+                        {t("Update to v")}
+                        {latestVersion}
                       </a>
                     ) : (
-                      <span className="text-xs text-normal"> (up to date)</span>
+                      <span className="text-xs text-normal"> {t(" (up to date)")}</span>
                     )}
                   </>
                 )}
@@ -124,7 +141,7 @@ const SettingsMainV2: React.FC<SettingsMainV2Props> = ({ plugin }) => {
             </div>
             <div className="self-end sm:self-auto">
               <Button variant="secondary" size="sm" onClick={handleReset}>
-                Reset Settings
+                {t("Reset Settings")}
               </Button>
             </div>
           </h1>

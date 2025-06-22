@@ -40,6 +40,7 @@ import React, {
 } from "react";
 import { useDropzone } from "react-dropzone";
 import ContextControl from "./ContextControl";
+import { t } from "@/lang/helper";
 
 interface ChatInputProps {
   inputMessage: string;
@@ -466,7 +467,7 @@ const ChatInput = forwardRef<{ focus: () => void }, ChatInputProps>(
             ref={textAreaRef}
             className="w-full bg-transparent focus-visible:ring-0 border-none min-h-[60px] max-h-40 overflow-y-auto resize-none px-2 rounded-md text-sm text-normal"
             placeholder={
-              "Ask anything. [[ for notes. / for custom prompts. " +
+              t("Ask anything. [[ for notes. / for custom prompts.") +
               (isCopilotPlus ? "@ for tools." : "")
             }
             value={inputMessage}
@@ -480,7 +481,7 @@ const ChatInput = forwardRef<{ focus: () => void }, ChatInputProps>(
               {/* Overlay that appears when dragging */}
               {isDragActive && (
                 <div className="absolute inset-0 bg-primary border border-dashed border-primary rounded-md flex items-center justify-center">
-                  <span className="text-primary">Drop images here...</span>
+                  <span className="text-primary">{t("Drop images here...")}</span>
                 </div>
               )}
             </>
@@ -491,14 +492,14 @@ const ChatInput = forwardRef<{ focus: () => void }, ChatInputProps>(
           {isGenerating ? (
             <div className="flex items-center gap-1 px-1 text-faint text-sm">
               <Loader2 className="size-3 animate-spin" />
-              <span>Generating...</span>
+              <span>{t("Generating...")}</span>
             </div>
           ) : (
             <DropdownMenu open={isModelDropdownOpen} onOpenChange={setIsModelDropdownOpen}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost2" size="fit">
                   {modelError ? (
-                    <span className="text-error">Model Load Failed</span>
+                    <span className="text-error">{t("Model Load Failed")}</span>
                   ) : settings.activeModels.find(
                       (model) => model.enabled && getModelKeyFromModel(model) === currentModelKey
                     ) ? (
@@ -512,7 +513,7 @@ const ChatInput = forwardRef<{ focus: () => void }, ChatInputProps>(
                       iconSize={8}
                     />
                   ) : (
-                    "Select Model"
+                    t("Select Model")
                   )}
                   <ChevronDown className="size-5 mt-0.5" />
                 </Button>
@@ -537,7 +538,7 @@ const ChatInput = forwardRef<{ focus: () => void }, ChatInputProps>(
                             setModelError(null);
                             setCurrentModelKey(getModelKeyFromModel(model));
                           } catch (error) {
-                            const msg = `Model switch failed: ` + err2String(error);
+                            const msg = t("Model switch failed: ") + err2String(error);
                             setModelError(msg);
                             new Notice(msg);
                             // Restore to the last valid model
@@ -568,7 +569,7 @@ const ChatInput = forwardRef<{ focus: () => void }, ChatInputProps>(
                 onClick={() => onStopGenerating()}
               >
                 <StopCircle className="size-4" />
-                Stop
+                {t("Stop")}
               </Button>
             ) : (
               <>
