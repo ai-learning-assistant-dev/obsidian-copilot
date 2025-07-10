@@ -134,7 +134,6 @@ export default class CopilotPlugin extends Plugin {
       if (linkedFile instanceof TFile) filesToTranscribe.push(linkedFile);
       else {
         if (this.asrSettings.Asr_debugMode) console.log("Could not find file " + linkedFilePath);
-        continue;
       }
     }
     return filesToTranscribe;
@@ -147,16 +146,16 @@ export default class CopilotPlugin extends Plugin {
   ) {
     try {
       if (this.asrSettings.Asr_debugMode) console.log("Transcribing " + file.path);
-
       const transcription = await this.transcriptionEngine.getTranscription(file);
 
       let fileText = await this.app.vault.read(parent_file);
       const fileLinkString = this.app.metadataCache.fileToLinktext(file, parent_file.path);
-      const fileLinkStringTagged = `[[${fileLinkString}]]`;
+      let fileLinkStringTagged = `${fileLinkString}]]`;
+      // Remove the leading 前3个字符 from the fileLinkStringTagged
+      fileLinkStringTagged = fileLinkStringTagged.slice(3);
 
       const startReplacementIndex =
         fileText.indexOf(fileLinkStringTagged) + fileLinkStringTagged.length;
-
       if (this.asrSettings.Asr_lineSpacing === "single") {
         fileText = [
           fileText.slice(0, startReplacementIndex),
@@ -183,10 +182,7 @@ export default class CopilotPlugin extends Plugin {
       // First check if 402 is in the error message, if so alert the user that they need to pay
 
       if (error?.message?.includes("402")) {
-        new Notice(
-          "You have exceeded the free tier.\nPlease upgrade to a paid plan at swiftink.io/pricing to continue transcribing files.\nThanks for using Swiftink!",
-          10 * 1000
-        );
+        new Notice("You have exceeded the free tier", 10 * 1000);
       } else {
         if (this.asrSettings.Asr_debugMode) console.log(error);
         new Notice(`Error transcribing file: ${error}`, 10 * 1000);
@@ -506,9 +502,8 @@ export default class CopilotPlugin extends Plugin {
 
   onFileMenu(menu: Menu, file: TFile) {
     const parentFile = this.app.workspace.getActiveFile();
-
     // Check if the parent file is not null and the file is of a type you want to handle
-    if (parentFile instanceof TFile && file instanceof TFile) {
+    if (parentFile instanceof TFile) {
       // Get the file extension
       const fileExtension = file.extension?.toLowerCase();
 
