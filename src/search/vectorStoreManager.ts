@@ -118,9 +118,19 @@ export default class VectorStoreManager {
     return this.dbOps.getIndexedFiles();
   }
 
+  /**
+   * Check if the index is empty
+   */
   public async isIndexEmpty(): Promise<boolean> {
     await this.waitForInitialization();
     return await this.dbOps.isIndexEmpty();
+  }
+
+  /**
+   * 展示数据库中所有文档的详细信息，包括workspace属性
+   */
+  public async displayDatabaseContents(): Promise<void> {
+    return this.indexOps.displayDatabaseContents();
   }
 
   public async hasIndex(notePath: string): Promise<boolean> {

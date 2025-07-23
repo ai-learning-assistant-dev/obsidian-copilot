@@ -5,6 +5,7 @@ import { logInfo } from "@/logger";
 import VectorStoreManager from "@/search/vectorStoreManager";
 import { getSettings } from "@/settings/model";
 import { extractNoteFiles, removeThinkTags, withSuppressedTokenWarnings } from "@/utils";
+import { workspaceManager } from "@/utils/workspaceUtils";
 import { BaseCallbackConfig } from "@langchain/core/callbacks/manager";
 import { Document } from "@langchain/core/documents";
 import { BaseChatModelCallOptions } from "@langchain/core/language_models/chat_models";
@@ -159,6 +160,7 @@ export class HybridRetriever extends BaseRetriever {
 
   private async getExplicitChunks(noteFiles: TFile[]): Promise<Document[]> {
     const explicitChunks: Document[] = [];
+
     for (const noteFile of noteFiles) {
       const db = await VectorStoreManager.getInstance().getDb();
       const hits = await DBOperations.getDocsByPath(db, noteFile.path);
@@ -180,9 +182,14 @@ export class HybridRetriever extends BaseRetriever {
                 extension: hit.document.extension,
                 created_at: hit.document.created_at,
                 nchars: hit.document.nchars,
+                workspace_name: hit.document.workspace_name,
+                workspace_path: hit.document.workspace_path,
               },
             })
         );
+
+        // 显式提到的文件总是被包含，不受workspace过滤影响
+        // 这样用户可以跨workspace引用文件
         explicitChunks.push(...matchingChunks);
       }
     }
@@ -260,6 +267,27 @@ export class HybridRetriever extends BaseRetriever {
       };
     }
 
+    // Add workspace filter based on current workspace selection
+    const currentWorkspace = workspaceManager.getCurrentWorkspace();
+    if (currentWorkspace.currentWorkspacePath) {
+      // 根据当前选择的工作区过滤结果
+      searchParams.where = {
+        workspace_path: currentWorkspace.currentWorkspacePath,
+      };
+
+      if (getSettings().debug) {
+        console.log("==== Workspace Filter Applied ====");
+        console.log("Current workspace path:", currentWorkspace.currentWorkspacePath);
+        console.log("Filter condition:", searchParams.where);
+      }
+    } else {
+      if (getSettings().debug) {
+        console.log("==== No Workspace Filter ====");
+        console.log("Current workspace state:", currentWorkspace);
+        console.log("No workspace path found, searching all documents");
+      }
+    }
+
     // Add time range filter if provided
     if (this.options.timeRange) {
       const { startTime, endTime } = this.options.timeRange;
@@ -284,9 +312,17 @@ export class HybridRetriever extends BaseRetriever {
       logInfo("==== Modified time range: ====", startTime, endTime);
 
       // Perform a second search with time range filters
-      searchParams.where = {
-        mtime: { between: [startTime, endTime] },
-      };
+      // 如果已有workspace过滤，需要合并过滤条件
+      if (searchParams.where) {
+        searchParams.where = {
+          ...searchParams.where,
+          mtime: { between: [startTime, endTime] },
+        };
+      } else {
+        searchParams.where = {
+          mtime: { between: [startTime, endTime] },
+        };
+      }
 
       const timeIntervalResults = await search(db, searchParams);
 
@@ -326,6 +362,18 @@ export class HybridRetriever extends BaseRetriever {
     }
     const searchResults = await search(db, searchParams);
 
+    if (getSettings().debug) {
+      console.log("==== Search Results Debug ====");
+      console.log(`Found ${searchResults.hits.length} results`);
+      if (searchResults.hits.length > 0) {
+        console.log("Sample result workspace info:", {
+          path: searchResults.hits[0].document.path,
+          workspace_name: searchResults.hits[0].document.workspace_name,
+          workspace_path: searchResults.hits[0].document.workspace_path,
+        });
+      }
+    }
+
     // Add null check and validation for search results
     if (!searchResults || !searchResults.hits) {
       console.warn("Search results or hits are undefined");
@@ -363,6 +411,8 @@ export class HybridRetriever extends BaseRetriever {
             extension: hit.document.extension,
             created_at: hit.document.created_at,
             nchars: hit.document.nchars,
+            workspace_name: hit.document.workspace_name,
+            workspace_path: hit.document.workspace_path,
           },
         });
       })

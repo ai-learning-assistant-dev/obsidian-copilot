@@ -4,6 +4,7 @@ import { logError, logInfo } from "@/logger";
 import { RateLimiter } from "@/rateLimiter";
 import { getSettings, subscribeToSettingsChange } from "@/settings/model";
 import { formatDateTime } from "@/utils";
+import { findAllWorkspaces, WorkspaceInfo } from "@/utils/workspaceUtils";
 import { MD5 } from "crypto-js";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { App, Notice, TFile } from "obsidian";
@@ -90,18 +91,21 @@ export class IndexOperations {
         return 0;
       }
 
-      this.initializeIndexingState(files.length);
+      // 先准备chunks来获得实际要处理的文件数量
+      logInfo("Preparing chunks and filtering by workspace...");
+      const allChunks = await this.prepareAllChunks(files);
+      if (allChunks.length === 0) {
+        new Notice("No valid content to index (no files in workspaces).");
+        return 0;
+      }
+
+      // 统计实际要处理的文件数量
+      const actualFilesToProcess = new Set(allChunks.map((chunk) => chunk.fileInfo.path)).size;
+      this.initializeIndexingState(actualFilesToProcess);
       this.createIndexingNotice();
 
       // Clear the missing embeddings list before starting new indexing
       this.dbOps.clearFilesMissingEmbeddings();
-
-      // New: Prepare all chunks first
-      const allChunks = await this.prepareAllChunks(files);
-      if (allChunks.length === 0) {
-        new Notice("No valid content to index.");
-        return 0;
-      }
 
       // Process chunks in batches
       for (let i = 0; i < allChunks.length; i += this.embeddingBatchSize) {
@@ -194,6 +198,11 @@ export class IndexOperations {
             this.dbOps.checkIndexIntegrity().catch((err) => {
               logError("Background integrity check failed:", err);
             });
+
+            // 自动展示数据库内容
+            setTimeout(() => {
+              this.displayDatabaseContents();
+            }, 500);
           })
           .catch((err) => {
             logError("Background save failed:", err);
@@ -220,12 +229,52 @@ export class IndexOperations {
     }
     const embeddingModel = EmbeddingsManager.getModelName(embeddingInstance);
 
+    // 获取所有工作区信息
+    const allWorkspaces: WorkspaceInfo[] = await findAllWorkspaces(this.app);
+    logInfo(`Found ${allWorkspaces.length} workspaces for indexing`);
+
+    // 辅助函数：确定文件属于哪个工作区
+    const getWorkspaceForFile = (filePath: string): WorkspaceInfo | null => {
+      // 按路径长度排序，最长的路径优先匹配（更具体的工作区优先）
+      const sortedWorkspaces = [...allWorkspaces].sort(
+        (a, b) => b.relativePath.length - a.relativePath.length
+      );
+
+      for (const workspace of sortedWorkspaces) {
+        if (workspace.relativePath === "/") {
+          // 根目录工作区：只有当文件直接在根目录且没有其他更具体的匹配时才匹配
+          // 检查文件是否在根目录下（不包含子目录）
+          if (!filePath.includes("/")) {
+            return workspace;
+          }
+        } else {
+          // 非根目录工作区：检查文件是否在此工作区路径下
+          if (filePath.startsWith(workspace.relativePath + "/")) {
+            return workspace;
+          }
+          // 检查是否是工作区目录本身的文件（如果有的话）
+          if (filePath === workspace.relativePath) {
+            return workspace;
+          }
+        }
+      }
+      return null;
+    };
+
     const textSplitter = RecursiveCharacterTextSplitter.fromLanguage("markdown", {
       chunkSize: CHUNK_SIZE,
     });
     const allChunks: Array<{ content: string; fileInfo: any }> = [];
 
     for (const file of files) {
+      // 检查文件是否属于某个工作区
+      const fileWorkspace = getWorkspaceForFile(file.path);
+      if (!fileWorkspace) {
+        // 不在任何工作区中的文件跳过索引
+        logInfo(`Skipping file ${file.path} - not in any workspace`);
+        continue;
+      }
+
       const content = await this.app.vault.cachedRead(file);
       if (!content?.trim()) continue;
 
@@ -238,6 +287,8 @@ export class IndexOperations {
         mtime: file.stat.mtime,
         tags: fileCache?.tags?.map((tag) => tag.tag) ?? [],
         extension: file.extension,
+        workspace_name: fileWorkspace.name,
+        workspace_path: fileWorkspace.relativePath,
         metadata: {
           ...(fileCache?.frontmatter ?? {}),
           created: formatDateTime(new Date(file.stat.ctime)).display,
@@ -264,11 +315,105 @@ export class IndexOperations {
       });
     }
 
+    logInfo(`Prepared ${allChunks.length} chunks from workspace files`);
     return allChunks;
   }
 
   private getDocHash(sourceDocument: string): string {
     return MD5(sourceDocument).toString();
+  }
+
+  /**
+   * 展示数据库中所有文档的详细信息，包括workspace属性
+   */
+  public async displayDatabaseContents(): Promise<void> {
+    try {
+      const db = await this.dbOps.getDb();
+      if (!db) {
+        console.log("❌ 数据库未初始化");
+        new Notice("数据库未初始化，请先创建索引");
+        return;
+      }
+
+      const allDocuments = await DBOperations.getAllDocuments(db);
+
+      if (allDocuments.length === 0) {
+        console.log("📭 数据库为空，没有已索引的文档");
+        new Notice("数据库为空，没有已索引的文档");
+        return;
+      }
+
+      console.log(`\n🗃️  数据库内容展示 - 共 ${allDocuments.length} 个文档片段\n`);
+      console.log("=".repeat(80));
+
+      // 按工作区分组统计
+      const workspaceStats = new Map<string, number>();
+      const workspaceDetails = new Map<string, any[]>();
+
+      allDocuments.forEach((doc, index) => {
+        const workspaceName = doc.workspace_name || "未分配工作区";
+        const workspacePath = doc.workspace_path || "无路径";
+        const workspaceKey = `${workspaceName} (${workspacePath})`;
+
+        // 统计数量
+        workspaceStats.set(workspaceKey, (workspaceStats.get(workspaceKey) || 0) + 1);
+
+        // 收集详细信息
+        if (!workspaceDetails.has(workspaceKey)) {
+          workspaceDetails.set(workspaceKey, []);
+        }
+
+        workspaceDetails.get(workspaceKey)!.push({
+          index: index + 1,
+          id: doc.id,
+          title: doc.title,
+          path: doc.path,
+          extension: doc.extension,
+          tags: doc.tags,
+          contentLength: doc.content?.length || 0,
+          embeddingModel: doc.embeddingModel,
+          created: new Date(doc.created_at).toLocaleString(),
+          modified: new Date(doc.mtime).toLocaleString(),
+        });
+      });
+
+      // 展示工作区统计
+      console.log("📊 工作区统计:");
+      workspaceStats.forEach((count, workspace) => {
+        console.log(`   ${workspace}: ${count} 个文档片段`);
+      });
+
+      console.log("\n" + "=".repeat(80));
+
+      // 展示每个工作区的详细信息
+      workspaceDetails.forEach((docs, workspaceKey) => {
+        console.log(`\n📁 工作区: ${workspaceKey}`);
+        console.log("-".repeat(60));
+
+        docs.forEach((doc) => {
+          console.log(`
+  📄 [${doc.index}] ${doc.title}
+     📍 路径: ${doc.path}
+     🔗 ID: ${doc.id.substring(0, 16)}...
+     📝 内容长度: ${doc.contentLength} 字符
+     🏷️  标签: ${doc.tags.join(", ") || "无"}
+     🤖 嵌入模型: ${doc.embeddingModel}
+     📅 创建时间: ${doc.created}
+     ✏️  修改时间: ${doc.modified}
+     📐 扩展名: ${doc.extension}`);
+        });
+      });
+
+      console.log("\n" + "=".repeat(80));
+      console.log(`✅ 数据库内容展示完成 - 总计 ${allDocuments.length} 个文档片段`);
+
+      new Notice(
+        `数据库包含 ${allDocuments.length} 个文档片段，分布在 ${workspaceStats.size} 个工作区中`
+      );
+    } catch (error) {
+      console.error("❌ 展示数据库内容时出错:", error);
+      new Notice("展示数据库内容时出错，请查看控制台");
+    }
   }
 
   private async getFilesToIndex(overwrite?: boolean): Promise<TFile[]> {

@@ -25,6 +25,8 @@ export interface OramaDocument {
   extension: string;
   nchars: number;
   metadata: Record<string, any>;
+  workspace_name?: string;
+  workspace_path?: string;
 }
 
 export class DBOperations {
@@ -356,6 +358,8 @@ export class DBOperations {
       mtime: "number",
       tags: "string[]",
       extension: "string",
+      workspace_name: "string",
+      workspace_path: "string",
     };
   }
 
