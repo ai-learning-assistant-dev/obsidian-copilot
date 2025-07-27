@@ -53,7 +53,7 @@ export class HybridRetriever extends BaseRetriever {
       // Retrieve chunks for explicitly mentioned note files
       const explicitChunks = await this.getExplicitChunks(noteFiles);
       let rewrittenQuery = query;
-      if (config?.runName !== "no_hyde") {
+      if (config?.runName === "enable_hyde") {
         // Use config to determine if HyDE should be used
         // Generate a hypothetical answer passage
         rewrittenQuery = await this.rewriteQuery(query);
@@ -111,17 +111,54 @@ export class HybridRetriever extends BaseRetriever {
       if (getSettings().debug) {
         console.log("*** HYBRID RETRIEVER DEBUG INFO: ***");
 
-        if (config?.runName !== "no_hyde") {
+        if (config?.runName === "enable_hyde") {
           console.log("\nOriginal Query: ", query);
           console.log("Rewritten Query: ", rewrittenQuery);
         }
 
-        console.log("\nExplicit Chunks: ", explicitChunks);
-        console.log("Orama Chunks: ", oramaChunks);
-        console.log("Combined Chunks: ", combinedChunks);
+        console.log(
+          "\nExplicit Chunks: ",
+          explicitChunks.map((chunk) => ({
+            path: chunk.metadata.path,
+            title: chunk.metadata.title,
+            subtitle: chunk.metadata.subtitle,
+            score: chunk.metadata.score,
+            contentLength: chunk.pageContent.length,
+          }))
+        );
+        console.log(
+          "Orama Chunks: ",
+          oramaChunks.map((chunk) => ({
+            path: chunk.metadata.path,
+            title: chunk.metadata.title,
+            subtitle: chunk.metadata.subtitle,
+            score: chunk.metadata.score,
+            contentLength: chunk.pageContent.length,
+          }))
+        );
+        console.log(
+          "Combined Chunks: ",
+          combinedChunks.map((chunk) => ({
+            path: chunk.metadata.path,
+            title: chunk.metadata.title,
+            subtitle: chunk.metadata.subtitle,
+            score: chunk.metadata.score,
+            contentLength: chunk.pageContent.length,
+          }))
+        );
         console.log("Max Orama Score: ", maxOramaScore);
         if (shouldRerank) {
-          console.log("Reranked Chunks: ", finalChunks);
+          console.log(
+            "Reranked Chunks: ",
+            finalChunks.map((chunk) => ({
+              path: chunk.metadata.path,
+              title: chunk.metadata.title,
+              subtitle: chunk.metadata.subtitle,
+              score: chunk.metadata.score,
+              rerank_score: chunk.metadata.rerank_score,
+              contentLength: chunk.pageContent.length,
+            }))
+          );
         } else {
           console.log("No reranking applied.");
         }
@@ -176,6 +213,7 @@ export class HybridRetriever extends BaseRetriever {
                 mtime: hit.document.mtime,
                 ctime: hit.document.ctime,
                 title: hit.document.title,
+                subtitle: hit.document.subtitle || "/",
                 id: hit.document.id,
                 embeddingModel: hit.document.embeddingModel,
                 tags: hit.document.tags,
@@ -267,21 +305,17 @@ export class HybridRetriever extends BaseRetriever {
       };
     }
 
-    // Add workspace filter based on current workspace selection
+    // Note: Orama has a bug with where conditions in all search modes
+    // We'll search without where condition and manually filter results
     const currentWorkspace = workspaceManager.getCurrentWorkspace();
-    if (currentWorkspace.currentWorkspacePath) {
-      // 根据当前选择的工作区过滤结果
-      searchParams.where = {
-        workspace_path: currentWorkspace.currentWorkspacePath,
-      };
+    const shouldFilterByWorkspace = currentWorkspace.currentWorkspacePath;
 
-      if (getSettings().debug) {
-        console.log("==== Workspace Filter Applied ====");
+    if (getSettings().debug) {
+      if (shouldFilterByWorkspace) {
+        console.log("==== Workspace Filter (Manual) ====");
         console.log("Current workspace path:", currentWorkspace.currentWorkspacePath);
-        console.log("Filter condition:", searchParams.where);
-      }
-    } else {
-      if (getSettings().debug) {
+        console.log("Will manually filter results after search");
+      } else {
         console.log("==== No Workspace Filter ====");
         console.log("Current workspace state:", currentWorkspace);
         console.log("No workspace path found, searching all documents");
@@ -312,22 +346,25 @@ export class HybridRetriever extends BaseRetriever {
       logInfo("==== Modified time range: ====", startTime, endTime);
 
       // Perform a second search with time range filters
-      // 如果已有workspace过滤，需要合并过滤条件
-      if (searchParams.where) {
-        searchParams.where = {
-          ...searchParams.where,
-          mtime: { between: [startTime, endTime] },
-        };
-      } else {
-        searchParams.where = {
-          mtime: { between: [startTime, endTime] },
-        };
-      }
-
+      // Due to Orama where condition bug, we'll search without where and manually filter
       const timeIntervalResults = await search(db, searchParams);
 
-      // Convert timeIntervalResults to Document objects
-      const timeIntervalDocuments = timeIntervalResults.hits.map(
+      // Manually filter by time range and workspace
+      const filteredTimeResults = {
+        ...timeIntervalResults,
+        hits: timeIntervalResults.hits.filter((hit) => {
+          // Filter by time range
+          const mtimeInRange = hit.document.mtime >= startTime && hit.document.mtime <= endTime;
+          // Filter by workspace if needed
+          const workspaceMatch =
+            !shouldFilterByWorkspace ||
+            hit.document.workspace_path === currentWorkspace.currentWorkspacePath;
+          return mtimeInRange && workspaceMatch;
+        }),
+      };
+
+      // Convert filtered time results to Document objects
+      const timeIntervalDocuments = filteredTimeResults.hits.map(
         (hit) =>
           new Document({
             pageContent: hit.document.content,
@@ -338,6 +375,7 @@ export class HybridRetriever extends BaseRetriever {
               mtime: hit.document.mtime,
               ctime: hit.document.ctime,
               title: hit.document.title,
+              subtitle: hit.document.subtitle || "/",
               id: hit.document.id,
               embeddingModel: hit.document.embeddingModel,
               tags: hit.document.tags,
@@ -362,14 +400,37 @@ export class HybridRetriever extends BaseRetriever {
     }
     const searchResults = await search(db, searchParams);
 
+    // Manually filter by workspace if needed (due to Orama where condition bug)
+    let filteredResults = searchResults;
+    if (shouldFilterByWorkspace) {
+      filteredResults = {
+        ...searchResults,
+        hits: searchResults.hits.filter(
+          (hit) => hit.document.workspace_path === currentWorkspace.currentWorkspacePath
+        ),
+      };
+
+      if (getSettings().debug) {
+        console.log(`==== Manual Workspace Filtering ====`);
+        console.log(`Original results: ${searchResults.hits.length}`);
+        console.log(`After workspace filter: ${filteredResults.hits.length}`);
+      }
+    }
+
     if (getSettings().debug) {
       console.log("==== Search Results Debug ====");
-      console.log(`Found ${searchResults.hits.length} results`);
-      if (searchResults.hits.length > 0) {
+      console.log(`Found ${filteredResults.hits.length} results (after filtering)`);
+      if (filteredResults.hits.length > 0) {
         console.log("Sample result workspace info:", {
-          path: searchResults.hits[0].document.path,
-          workspace_name: searchResults.hits[0].document.workspace_name,
-          workspace_path: searchResults.hits[0].document.workspace_path,
+          path: filteredResults.hits[0].document.path,
+          workspace_name: filteredResults.hits[0].document.workspace_name,
+          workspace_path: filteredResults.hits[0].document.workspace_path,
+        });
+        console.log("Top 3 results with details:");
+        filteredResults.hits.slice(0, 3).forEach((hit, index) => {
+          console.log(
+            `[${index + 1}] Score: ${hit.score}, Path: ${hit.document.path}, Workspace: ${hit.document.workspace_name} (${hit.document.workspace_path}), Title: ${hit.document.title}`
+          );
         });
       }
     }
@@ -381,7 +442,7 @@ export class HybridRetriever extends BaseRetriever {
     }
 
     // Convert Orama search results to Document objects
-    return searchResults.hits
+    return filteredResults.hits
       .map((hit) => {
         if (!hit || !hit.document) {
           console.warn("Invalid hit or document in search results");
@@ -405,6 +466,7 @@ export class HybridRetriever extends BaseRetriever {
             mtime: hit.document.mtime,
             ctime: hit.document.ctime,
             title: hit.document.title || "",
+            subtitle: hit.document.subtitle || "/",
             id: hit.document.id,
             embeddingModel: hit.document.embeddingModel,
             tags: hit.document.tags || [],

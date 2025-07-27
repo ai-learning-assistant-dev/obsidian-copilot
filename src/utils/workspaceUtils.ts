@@ -1,5 +1,11 @@
 import { App, TFolder, TFile } from "obsidian";
 import { CharacterPresetItem } from "@/settings/model";
+import { CHUNK_SIZE } from "@/constants";
+
+/**
+ * Default chunk size when workspace config doesn't specify one
+ */
+export const DEFAULT_WORKSPACE_CHUNK_SIZE = CHUNK_SIZE;
 
 /**
  * Workspace information interface
@@ -15,6 +21,7 @@ export interface WorkspaceConfig {
   version: string;
   excludedPaths?: string[];
   personas?: PersonaConfig[];
+  chunk_size?: number;
 }
 
 // export interface PersonaConfig {
@@ -88,6 +95,24 @@ export async function getWorkspaceConfig(app: App, filePath: string): Promise<Wo
 
   const content = await app.vault.read(configFile);
   return JSON.parse(content) as WorkspaceConfig;
+}
+
+/**
+ * Get workspace configuration by workspace info
+ * @param app Obsidian app instance
+ * @param workspace Workspace information
+ * @returns Promise<WorkspaceConfig | null> Workspace config if found, null otherwise
+ */
+export async function getWorkspaceConfigByInfo(
+  app: App,
+  workspace: WorkspaceInfo
+): Promise<WorkspaceConfig | null> {
+  try {
+    return await getWorkspaceConfig(app, workspace.relativePath);
+  } catch (error) {
+    console.error(`Error getting workspace config for ${workspace.relativePath}:`, error);
+    return null;
+  }
 }
 
 /**
