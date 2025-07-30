@@ -166,8 +166,24 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
             if (index % 2 === 0) {
               // Process links only in non-code blocks
               return part.replace(regex, (match: string, selection: string) => {
-                const file = app.metadataCache.getFirstLinkpathDest(selection, sourcePath);
-                return file ? template(file) : match;
+                // For links with headings (e.g., "filename#heading"), extract just the filename for file lookup
+                const fileName = selection.includes("#") ? selection.split("#")[0] : selection;
+                const file = app.metadataCache.getFirstLinkpathDest(fileName, sourcePath);
+
+                if (file) {
+                  // If the original selection contains a heading, create a link that opens to the heading
+                  if (selection.includes("#")) {
+                    const heading = selection.split("#").slice(1).join("#"); // Handle multiple # in heading
+                    const linkText = `${file.basename}#${heading}`;
+                    const linkData = `${file.basename}#${heading}`;
+
+                    return `<a href="#" data-link="${linkData}" class="copilot-heading-link" style="text-decoration: underline; color: var(--link-color);">${linkText}</a>`;
+                  } else {
+                    return template(file);
+                  }
+                } else {
+                  return match;
+                }
               });
             }
             // Return code blocks unchanged
@@ -426,6 +442,35 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
   useEffect(() => {
     setEditedMessage(message.message);
   }, [message.message]);
+
+  // Handle click events for heading links
+  useEffect(() => {
+    const handleHeadingLinkClick = (event: Event) => {
+      const target = event.target as HTMLElement;
+      if (target.classList.contains("copilot-heading-link")) {
+        event.preventDefault();
+        const linkData = target.getAttribute("data-link");
+        if (linkData) {
+          app.workspace.openLinkText(linkData, "");
+        }
+      }
+    };
+
+    // Store the current ref value in a variable
+    const currentContentElement = contentRef.current;
+
+    // Add event listener to the content element
+    if (currentContentElement) {
+      currentContentElement.addEventListener("click", handleHeadingLinkClick);
+    }
+
+    // Cleanup function using the stored variable
+    return () => {
+      if (currentContentElement) {
+        currentContentElement.removeEventListener("click", handleHeadingLinkClick);
+      }
+    };
+  }, [app]);
 
   const adjustTextareaHeight = (element: HTMLTextAreaElement) => {
     element.style.height = "auto";
