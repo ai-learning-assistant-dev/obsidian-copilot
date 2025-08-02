@@ -572,6 +572,36 @@ export function extractUniqueTitlesFromDocs(docs: Document[]): string[] {
   return Array.from(titlesSet);
 }
 
+export function extractUniqueLinksFromDocs(docs: Document[]): string[] {
+  const linksSet = new Set<string>();
+  docs.forEach((doc) => {
+    if (doc.metadata?.title) {
+      const title = doc.metadata.title;
+      const subtitle = doc.metadata.subtitle;
+
+      // 根据subtitle生成不同的链接格式
+      if (!subtitle || subtitle === "/") {
+        // 没有subtitle或者subtitle是根目录，直接链接到文档
+        linksSet.add(`[[${title}]]`);
+      } else {
+        // 有subtitle，链接到特定标题
+        // subtitle格式: "/一级标题" 或 "/一级标题/二级标题"
+        // 提取最后一级标题作为链接目标
+        const headingParts = subtitle.split("/").filter((part: string) => part.trim() !== "");
+        if (headingParts.length > 0) {
+          const targetHeading = headingParts[headingParts.length - 1];
+          linksSet.add(`[[${title}#${targetHeading}]]`);
+        } else {
+          // 如果解析失败，回退到文档链接
+          linksSet.add(`[[${title}]]`);
+        }
+      }
+    }
+  });
+
+  return Array.from(linksSet);
+}
+
 export function extractJsonFromCodeBlock(content: string): any {
   const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   const jsonContent = codeBlockMatch ? codeBlockMatch[1].trim() : content.trim();

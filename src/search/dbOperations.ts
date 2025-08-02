@@ -25,6 +25,9 @@ export interface OramaDocument {
   extension: string;
   nchars: number;
   metadata: Record<string, any>;
+  workspace_name?: string;
+  workspace_path?: string;
+  subtitle?: string; // 新增字段：标题路径，如 "/" 或 "/一级标题" 或 "/一级标题/二级标题"
 }
 
 export class DBOperations {
@@ -356,6 +359,9 @@ export class DBOperations {
       mtime: "number",
       tags: "string[]",
       extension: "string",
+      workspace_name: "string",
+      workspace_path: "string",
+      subtitle: "string", // 标题路径，如 "/" 或 "/一级标题" 或 "/一级标题/二级标题"
     };
   }
 

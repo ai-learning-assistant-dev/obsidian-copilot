@@ -23,7 +23,8 @@ import { ToolManager } from "@/tools/toolManager";
 import {
   err2String,
   extractChatHistory,
-  extractUniqueTitlesFromDocs,
+  // extractUniqueTitlesFromDocs,
+  extractUniqueLinksFromDocs,
   extractYoutubeUrl,
   formatDateTime,
   getApiErrorMessage,
@@ -467,9 +468,9 @@ class VaultQAChainRunner extends BaseChainRunner {
   }
 
   private addSourcestoResponse(response: string): string {
-    const docTitles = extractUniqueTitlesFromDocs(this.chainManager.getRetrievedDocuments());
-    if (docTitles.length > 0) {
-      const links = docTitles.map((title) => `- [[${title}]]`).join("\n");
+    const docLinks = extractUniqueLinksFromDocs(this.chainManager.getRetrievedDocuments());
+    if (docLinks.length > 0) {
+      const links = docLinks.map((link) => `- ${link}`).join("\n");
       response += "\n\n#### Sources:\n\n" + links;
     }
     return response;

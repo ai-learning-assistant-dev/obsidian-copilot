@@ -1,5 +1,11 @@
-import { App, TFolder, TAbstractFile, TFile } from "obsidian";
+import { App, TFolder, TFile } from "obsidian";
 import { CharacterPresetItem } from "@/settings/model";
+import { CHUNK_SIZE } from "@/constants";
+
+/**
+ * Default chunk size when workspace config doesn't specify one
+ */
+export const DEFAULT_WORKSPACE_CHUNK_SIZE = CHUNK_SIZE;
 
 /**
  * Workspace information interface
@@ -15,6 +21,7 @@ export interface WorkspaceConfig {
   version: string;
   excludedPaths?: string[];
   personas?: PersonaConfig[];
+  chunk_size?: number;
 }
 
 // export interface PersonaConfig {
@@ -29,8 +36,9 @@ export interface PersonaConfig {
   prompt: string;
 }
 
-export async function convertToPersonaConfig(item: PersonaConfig | CharacterPresetItem): Promise<PersonaConfig> {
-  
+export async function convertToPersonaConfig(
+  item: PersonaConfig | CharacterPresetItem
+): Promise<PersonaConfig> {
   const personaConfig: PersonaConfig = {
     id: item.id,
     name: item.name,
@@ -80,13 +88,31 @@ export async function isWorkspaceFolder(
 export async function getWorkspaceConfig(app: App, filePath: string): Promise<WorkspaceConfig> {
   const configPath = filePath === "/" ? "data.md" : `${filePath}/data.md`;
   const configFile = app.vault.getAbstractFileByPath(configPath);
-  
+
   if (!(configFile instanceof TFile)) {
     throw new Error(`Config file not found at ${configPath}`);
   }
 
   const content = await app.vault.read(configFile);
   return JSON.parse(content) as WorkspaceConfig;
+}
+
+/**
+ * Get workspace configuration by workspace info
+ * @param app Obsidian app instance
+ * @param workspace Workspace information
+ * @returns Promise<WorkspaceConfig | null> Workspace config if found, null otherwise
+ */
+export async function getWorkspaceConfigByInfo(
+  app: App,
+  workspace: WorkspaceInfo
+): Promise<WorkspaceConfig | null> {
+  try {
+    return await getWorkspaceConfig(app, workspace.relativePath);
+  } catch (error) {
+    console.error(`Error getting workspace config for ${workspace.relativePath}:`, error);
+    return null;
+  }
 }
 
 /**
@@ -152,7 +178,7 @@ export async function findAllWorkspaces(
 
     const result = await searchWorkspacesInFolder(app, rootFolder, options);
     console.log(`Found ${result.length} workspaces in project root:`, result);
-    return result
+    return result;
   } catch (error) {
     console.error("Error finding workspaces:", error);
     return [];
@@ -172,14 +198,10 @@ export async function findWorkspacesByName(
   options: WorkspaceDetectionOptions = {}
 ): Promise<WorkspaceInfo[]> {
   const allWorkspaces = await findAllWorkspaces(app, options);
-  
-  const pattern = typeof namePattern === "string" 
-    ? new RegExp(namePattern, "i") 
-    : namePattern;
 
-  return allWorkspaces.filter(workspace => 
-    pattern.test(workspace.name)
-  );
+  const pattern = typeof namePattern === "string" ? new RegExp(namePattern, "i") : namePattern;
+
+  return allWorkspaces.filter((workspace) => pattern.test(workspace.name));
 }
 
 /**
@@ -196,13 +218,13 @@ export async function getWorkspaceInfo(
 ): Promise<WorkspaceInfo | null> {
   try {
     const folder = app.vault.getAbstractFileByPath(folderPath);
-    
+
     if (!(folder instanceof TFolder)) {
       return null;
     }
 
     const { configFileName = "workspace_config" } = options;
-    
+
     if (await isWorkspaceFolder(app, folder, configFileName)) {
       return {
         name: folder.name,
@@ -215,7 +237,7 @@ export async function getWorkspaceInfo(
     console.error(`Error getting workspace info for ${folderPath}:`, error);
     return null;
   }
-} 
+}
 
 export interface WorkspaceState {
   currentWorkspacePath: string | null;
@@ -224,7 +246,7 @@ export interface WorkspaceState {
 class WorkspaceManager {
   private static instance: WorkspaceManager;
   private state: WorkspaceState = {
-    currentWorkspacePath: null
+    currentWorkspacePath: null,
   };
 
   private constructor() {}
