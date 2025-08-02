@@ -22,6 +22,12 @@ export function PromptEnhancementsSection() {
   const [speechPrompt, setSpeechPrompt] = useState(
     settings.promptEnhancements?.autoSpeech?.prompt || ""
   );
+
+  // 新增：是否播放 think 部分内容
+  const [speakThinkContent, setSpeakThinkContent] = useState(
+    settings.promptEnhancements?.autoSpeech?.speakThinkContent ?? true
+  );
+
   // 新增：是否拼接默认系统提示词
   const [appendDefaultPrompt, setAppendDefaultPrompt] = useState(
     settings.promptEnhancements?.appendDefaultPrompt ?? true
@@ -39,6 +45,7 @@ export function PromptEnhancementsSection() {
     setFollowUpPrompt(settings.promptEnhancements?.autoFollowUp?.prompt || "");
     setAutoSpeechEnabled(settings.promptEnhancements?.autoSpeech?.enabled || false);
     setSpeechPrompt(settings.promptEnhancements?.autoSpeech?.prompt || "");
+    setSpeakThinkContent(settings.promptEnhancements?.autoSpeech?.speakThinkContent ?? true);
     setAppendDefaultPrompt(settings.promptEnhancements?.appendDefaultPrompt ?? true);
     setUseOralPrompt(settings.promptEnhancements?.autoSpeech?.useOralPrompt ?? true);
   }, [settings.promptEnhancements]);
@@ -83,6 +90,18 @@ export function PromptEnhancementsSection() {
         ...settings.promptEnhancements?.autoSpeech,
         useOralPrompt: checked,
         // prompt: settings.promptEnhancements?.autoSpeech?.prompt || "", // 保持原有提示词
+      },
+    });
+  };
+
+  // 新增：处理 think 内容播放开关变化
+  const handleSpeakThinkContentChange = (checked: boolean) => {
+    setSpeakThinkContent(checked);
+    updateSetting("promptEnhancements", {
+      ...settings.promptEnhancements,
+      autoSpeech: {
+        ...settings.promptEnhancements?.autoSpeech,
+        speakThinkContent: checked,
       },
     });
   };
@@ -180,6 +199,17 @@ export function PromptEnhancementsSection() {
             description="开启后会在对话中自动播放AI回复的语音"
             checked={autoSpeechEnabled}
             onCheckedChange={handleSpeechToggleChange}
+          />
+        </div>
+
+        {/* 新增：think 内容播放开关 */}
+        <div className="tw-flex tw-items-center tw-justify-between">
+          <SettingItem
+            type="switch"
+            title="播放思考内容"
+            description="开启后会播放AI思考(think标签)部分的文本"
+            checked={speakThinkContent}
+            onCheckedChange={handleSpeakThinkContentChange}
           />
         </div>
 

@@ -262,10 +262,18 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
       }
 
       try {
-        const text = (textToSpeak || message.message || "").trim();
+        let text = (textToSpeak || message.message || "").trim();
         if (!text) {
           // console.error('[TTS] 播放失败: 文本内容为空');
           return;
+        }
+
+        // 如果设置为不播放 think 内容，则移除 think 标签及其内容
+        if (!settings.promptEnhancements?.autoSpeech?.speakThinkContent) {
+          // 移除完整的 think 标签及内容
+          text = text.replace(/<think>[\s\S]*?<\/think>/g, "");
+          // 也要移除未闭合的 think 标签（处理流式传输情况）
+          text = text.replace(/<think>[\s\S]*$/g, "");
         }
 
         // console.log('[TTS] 播放文本', { text });
@@ -275,7 +283,7 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
         new Notice("Failed to play audio");
       }
     },
-    [app, message.message]
+    [app, message.message, settings.promptEnhancements?.autoSpeech?.speakThinkContent]
   );
 
   useEffect(() => {
