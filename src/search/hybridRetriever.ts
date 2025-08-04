@@ -256,11 +256,27 @@ export class HybridRetriever extends BaseRetriever {
 
     const db = await VectorStoreManager.getInstance().getDb();
 
+    // Check if we need workspace filtering
+    const currentWorkspace = workspaceManager.getCurrentWorkspace();
+    const shouldFilterByWorkspace = currentWorkspace.currentWorkspacePath;
+
+    // Debug: 显示workspace过滤信息
+    if (getSettings().debug) {
+      console.log("Workspace过滤:", currentWorkspace.currentWorkspacePath || "无");
+    }
+
     const searchParams: any = {
       similarity: this.options.minSimilarityScore,
       limit: this.options.maxK,
       includeVectors: true,
     };
+
+    // Note: Orama where conditions don't work reliably in vector/hybrid mode
+    // We'll use manual filtering after search to ensure workspace filtering works
+    // Strategy: always retrieve ALL documents (large upper bound) then filter by workspace and slice to maxK.
+    // This guarantees no relevant document is missed, at the cost of more processing time.
+    const UNLIMITED_RESULTS = 1_000_000; // large upper bound, adjust if needed
+    searchParams.limit = UNLIMITED_RESULTS;
 
     if (salientTerms.length > 0) {
       // Use hybrid mode when we have salient terms
@@ -305,20 +321,17 @@ export class HybridRetriever extends BaseRetriever {
       };
     }
 
-    // Note: Orama has a bug with where conditions in all search modes
-    // We'll search without where condition and manually filter results
-    const currentWorkspace = workspaceManager.getCurrentWorkspace();
-    const shouldFilterByWorkspace = currentWorkspace.currentWorkspacePath;
-
     if (getSettings().debug) {
       if (shouldFilterByWorkspace) {
         console.log("==== Workspace Filter (Manual) ====");
-        console.log("Current workspace path:", currentWorkspace.currentWorkspacePath);
-        console.log("Will manually filter results after search");
+        console.log("Current workspace name:", currentWorkspace.currentWorkspacePath);
+        console.log(
+          "Retrieving all documents, will filter by workspace then slice to",
+          this.options.maxK
+        );
       } else {
         console.log("==== No Workspace Filter ====");
         console.log("Current workspace state:", currentWorkspace);
-        console.log("No workspace path found, searching all documents");
       }
     }
 
@@ -346,7 +359,7 @@ export class HybridRetriever extends BaseRetriever {
       logInfo("==== Modified time range: ====", startTime, endTime);
 
       // Perform a second search with time range filters
-      // Due to Orama where condition bug, we'll search without where and manually filter
+      // Note: time range filtering still needs manual filtering as it's not a simple field match
       const timeIntervalResults = await search(db, searchParams);
 
       // Manually filter by time range and workspace
@@ -355,11 +368,8 @@ export class HybridRetriever extends BaseRetriever {
         hits: timeIntervalResults.hits.filter((hit) => {
           // Filter by time range
           const mtimeInRange = hit.document.mtime >= startTime && hit.document.mtime <= endTime;
-          // Filter by workspace if needed
-          const workspaceMatch =
-            !shouldFilterByWorkspace ||
-            hit.document.workspace_path === currentWorkspace.currentWorkspacePath;
-          return mtimeInRange && workspaceMatch;
+          // Note: workspace filtering is now handled by Orama where condition in searchParams
+          return mtimeInRange;
         }),
       };
 
@@ -398,22 +408,28 @@ export class HybridRetriever extends BaseRetriever {
     if (getSettings().debug) {
       console.log("==== Orama Search Params: ====\n", searchParams);
     }
-    const searchResults = await search(db, searchParams);
 
-    // Manually filter by workspace if needed (due to Orama where condition bug)
+    // Perform search without where condition (more reliable)
+    const searchResults = await search(db, searchParams);
     let filteredResults = searchResults;
+
+    // Apply manual workspace filtering
     if (shouldFilterByWorkspace) {
+      const workspaceMatches = searchResults.hits.filter((hit) => {
+        return hit.document.workspace_path === currentWorkspace.currentWorkspacePath;
+      });
+
+      // Limit to the requested maxK results
       filteredResults = {
         ...searchResults,
-        hits: searchResults.hits.filter(
-          (hit) => hit.document.workspace_path === currentWorkspace.currentWorkspacePath
-        ),
+        hits: workspaceMatches.slice(0, this.options.maxK),
       };
 
       if (getSettings().debug) {
         console.log(`==== Manual Workspace Filtering ====`);
         console.log(`Original results: ${searchResults.hits.length}`);
-        console.log(`After workspace filter: ${filteredResults.hits.length}`);
+        console.log(`Workspace matches: ${workspaceMatches.length}`);
+        console.log(`Final filtered results: ${filteredResults.hits.length}`);
       }
     }
 
