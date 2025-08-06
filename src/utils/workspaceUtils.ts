@@ -1,5 +1,5 @@
 import { App, TFolder, TFile } from "obsidian";
-import { CharacterPresetItem } from "@/settings/model";
+import { CharacterPresetItem, getSettings } from "@/settings/model";
 import { CHUNK_SIZE } from "@/constants";
 
 /**
@@ -259,6 +259,9 @@ class WorkspaceManager {
   }
 
   public setCurrentWorkspace(path: string | null): void {
+    if (getSettings().debug) {
+      console.log("切换工作区:", this.state.currentWorkspacePath, "->", path);
+    }
     this.state.currentWorkspacePath = path;
   }
 

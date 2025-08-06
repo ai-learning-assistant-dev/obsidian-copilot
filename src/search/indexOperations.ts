@@ -415,10 +415,10 @@ export class IndexOperations {
 
     logInfo(`Prepared ${allChunks.length} chunks from workspace files`);
 
-    // Debug模式下输出所有分块的文本内容
+    // Debug模式下输出前两个分块的文本内容作为示例
     if (getSettings().debug) {
-      console.log("=== DEBUG: All Chunks Content ===");
-      allChunks.forEach((chunk, index) => {
+      console.log("=== DEBUG: Sample Chunks Content (showing first 2) ===");
+      allChunks.slice(0, 2).forEach((chunk, index) => {
         console.log(`\n--- Chunk ${index + 1}/${allChunks.length} ---`);
         console.log(`File: ${chunk.fileInfo.path}`);
         console.log(
@@ -430,7 +430,10 @@ export class IndexOperations {
         console.log(chunk.content);
         console.log("--- End of Chunk ---");
       });
-      console.log("=== END DEBUG: All Chunks Content ===\n");
+      if (allChunks.length > 2) {
+        console.log(`\n... 省略剩余 ${allChunks.length - 2} 个chunk ...`);
+      }
+      console.log("=== END DEBUG: Sample Chunks Content ===\n");
     }
 
     return allChunks;
@@ -503,12 +506,13 @@ export class IndexOperations {
 
       console.log("\n" + "=".repeat(80));
 
-      // 展示每个工作区的详细信息
+      // 展示每个工作区的详细信息（仅显示前2个文档作为示例）
       workspaceDetails.forEach((docs, workspaceKey) => {
         console.log(`\n📁 工作区: ${workspaceKey}`);
         console.log("-".repeat(60));
 
-        docs.forEach((doc) => {
+        const docsToShow = docs.slice(0, 2);
+        docsToShow.forEach((doc) => {
           console.log(`
   📄 [${doc.index}] ${doc.title}
      📍 路径: ${doc.path}
@@ -521,6 +525,10 @@ export class IndexOperations {
      ✏️  修改时间: ${doc.modified}
      📐 扩展名: ${doc.extension}`);
         });
+
+        if (docs.length > 2) {
+          console.log(`\n  ... 省略剩余 ${docs.length - 2} 个文档 ...`);
+        }
       });
 
       console.log("\n" + "=".repeat(80));
