@@ -298,19 +298,19 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
         componentRef.current = new Component();
       }
 
-      // 简化自动播放检查，只在非流式模式下播放
-      const canAutoPlay =
-        !isStreaming && // 只处理完整消息
-        !message.isErrorMessage && // 不处理错误消息
-        settings.promptEnhancements?.autoSpeech?.enabled &&
-        message.message &&
-        (app as any).plugins
-          ?.getPlugin("aloud-tts-ai-learning-assistant")
-          ?.ttsService?.isAvailable?.();
+      // // 简化自动播放检查，只在非流式模式下播放
+      // const canAutoPlay =
+      //   !isStreaming && // 只处理完整消息
+      //   !message.isErrorMessage && // 不处理错误消息
+      //   settings.promptEnhancements?.autoSpeech?.enabled &&
+      //   message.message &&
+      //   (app as any).plugins
+      //     ?.getPlugin("aloud-tts-ai-learning-assistant")
+      //     ?.ttsService?.isAvailable?.();
 
-      if (canAutoPlay) {
-        handleSpeak();
-      }
+      // if (canAutoPlay) {
+      //   handleSpeak();
+      // }
 
       const processedMessage = preprocess(message.message);
 
