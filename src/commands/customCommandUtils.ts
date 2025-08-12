@@ -14,8 +14,10 @@ import { updateCachedCommands } from "./state";
 import { PromptSortStrategy } from "@/types";
 import {
   extractNoteFiles,
+  extractNoteParagraphs,
   getFileContent,
   getFileName,
+  getFileParagraphs,
   getNotesFromPath,
   getNotesFromTags,
   processVariableNameForNotePath,
@@ -380,6 +382,21 @@ export async function processPrompt(
         }
         additionalInfo += `${noteContext}`;
         includedFiles.add(noteFile); // Track files included via [[links]]
+      }
+    }
+  }
+
+  // Process [[note title#1#2]] syntax
+  const noteParagraphs = extractNoteParagraphs(processedPrompt, vault);
+  for (const noteParagraph of noteParagraphs) {
+    // Check if this note wasn't already included via a variable
+    // We use the Set's reference equality which works for TFile objects
+    const noteContent = await getFileParagraphs(noteParagraph, vault);
+    if (noteContent) {
+      if (additionalInfo) {
+        additionalInfo += `\n\nTitle: [[${noteParagraph.reference}]]\nPath: ${noteParagraph.path}\n\n${noteContent}`;
+      } else {
+        additionalInfo += `Title: [[${noteParagraph.reference}]]\nPath: ${noteParagraph.path}\n\n${noteContent}`;
       }
     }
   }
