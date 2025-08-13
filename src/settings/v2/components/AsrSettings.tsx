@@ -100,7 +100,7 @@ const AsrSetting: React.FC<{ plugin: CopilotPlugin }> = ({ plugin }) => {
                 onChange={(e) => handleToggleChange("Asr_useLocalService")(e.target.checked)}
                 className="tw-peer tw-sr-only"
               />
-              <div className="tw-peer-checked:tw-after:tw-translate-x-full tw-peer-checked:tw-bg-primary tw-peer tw-h-6 tw-w-11 tw-rounded-full after:tw-absolute after:tw-left-[2px] after:tw-top-[2px] after:tw-size-5 after:tw-rounded-full after:tw-border after:tw-border-border after:tw-transition-all after:tw-content-[''] peer-focus:tw-outline-none peer-focus:tw-ring-2 peer-focus:tw-ring-ring"></div>
+              <div className="tw-peer-checked:tw-after:tw-translate-x-full tw-peer-checked:tw-bg-primary-500 tw-peer tw-h-6 tw-w-11 tw-rounded-full after:tw-absolute after:tw-left-[2px] after:tw-top-[2px] after:tw-size-5 after:tw-rounded-full after:tw-border after:tw-border-border after:tw-transition-all after:tw-content-[''] peer-focus:tw-outline-none peer-focus:tw-ring-2 peer-focus:tw-ring-ring"></div>
             </label>
           </div>
 
@@ -392,7 +392,7 @@ const AsrSetting: React.FC<{ plugin: CopilotPlugin }> = ({ plugin }) => {
                 onChange={(e) => saveSetting({ Asr_timestamps: e.target.checked })}
                 className="tw-peer tw-sr-only"
               />
-              <div className="tw-peer-checked:tw-after:tw-translate-x-full tw-peer-checked:tw-bg-primary tw-peer tw-h-6 tw-w-11 tw-rounded-full after:tw-absolute after:tw-left-[2px] after:tw-top-[2px] after:tw-size-5 after:tw-rounded-full after:tw-border after:tw-border-border after:tw-transition-all after:tw-content-[''] peer-focus:tw-outline-none peer-focus:tw-ring-2 peer-focus:tw-ring-ring"></div>
+              <div className="tw-peer-checked:tw-after:tw-translate-x-full tw-peer-checked:tw-bg-primary-500 tw-peer tw-h-6 tw-w-11 tw-rounded-full after:tw-absolute after:tw-left-[2px] after:tw-top-[2px] after:tw-size-5 after:tw-rounded-full after:tw-border after:tw-border-border after:tw-transition-all after:tw-content-[''] peer-focus:tw-outline-none peer-focus:tw-ring-2 peer-focus:tw-ring-ring"></div>
             </label>
           </div>
 
