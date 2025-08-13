@@ -166,8 +166,24 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
             if (index % 2 === 0) {
               // Process links only in non-code blocks
               return part.replace(regex, (match: string, selection: string) => {
-                const file = app.metadataCache.getFirstLinkpathDest(selection, sourcePath);
-                return file ? template(file) : match;
+                // For links with headings (e.g., "filename#heading"), extract just the filename for file lookup
+                const fileName = selection.includes("#") ? selection.split("#")[0] : selection;
+                const file = app.metadataCache.getFirstLinkpathDest(fileName, sourcePath);
+
+                if (file) {
+                  // If the original selection contains a heading, create a link that opens to the heading
+                  if (selection.includes("#")) {
+                    const heading = selection.split("#").slice(1).join("#"); // Handle multiple # in heading
+                    const linkText = `${file.basename}#${heading}`;
+                    const linkData = `${file.basename}#${heading}`;
+
+                    return `<a href="#" data-link="${linkData}" class="copilot-heading-link" style="text-decoration: underline; color: var(--link-color);">${linkText}</a>`;
+                  } else {
+                    return template(file);
+                  }
+                } else {
+                  return match;
+                }
               });
             }
             // Return code blocks unchanged
@@ -246,10 +262,18 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
       }
 
       try {
-        const text = (textToSpeak || message.message || "").trim();
+        let text = (textToSpeak || message.message || "").trim();
         if (!text) {
           // console.error('[TTS] 播放失败: 文本内容为空');
           return;
+        }
+
+        // 如果设置为不播放 think 内容，则移除 think 标签及其内容
+        if (!settings.promptEnhancements?.autoSpeech?.speakThinkContent) {
+          // 移除完整的 think 标签及内容
+          text = text.replace(/<think>[\s\S]*?<\/think>/g, "");
+          // 也要移除未闭合的 think 标签（处理流式传输情况）
+          text = text.replace(/<think>[\s\S]*$/g, "");
         }
 
         // console.log('[TTS] 播放文本', { text });
@@ -259,7 +283,7 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
         new Notice("Failed to play audio");
       }
     },
-    [app, message.message]
+    [app, message.message, settings.promptEnhancements?.autoSpeech?.speakThinkContent]
   );
 
   useEffect(() => {
@@ -274,19 +298,19 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
         componentRef.current = new Component();
       }
 
-      // 简化自动播放检查，只在非流式模式下播放
-      const canAutoPlay =
-        !isStreaming && // 只处理完整消息
-        !message.isErrorMessage && // 不处理错误消息
-        settings.promptEnhancements?.autoSpeech?.enabled &&
-        message.message &&
-        (app as any).plugins
-          ?.getPlugin("aloud-tts-ai-learning-assistant")
-          ?.ttsService?.isAvailable?.();
+      // // 简化自动播放检查，只在非流式模式下播放
+      // const canAutoPlay =
+      //   !isStreaming && // 只处理完整消息
+      //   !message.isErrorMessage && // 不处理错误消息
+      //   settings.promptEnhancements?.autoSpeech?.enabled &&
+      //   message.message &&
+      //   (app as any).plugins
+      //     ?.getPlugin("aloud-tts-ai-learning-assistant")
+      //     ?.ttsService?.isAvailable?.();
 
-      if (canAutoPlay) {
-        handleSpeak();
-      }
+      // if (canAutoPlay) {
+      //   handleSpeak();
+      // }
 
       const processedMessage = preprocess(message.message);
 
@@ -426,6 +450,35 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
   useEffect(() => {
     setEditedMessage(message.message);
   }, [message.message]);
+
+  // Handle click events for heading links
+  useEffect(() => {
+    const handleHeadingLinkClick = (event: Event) => {
+      const target = event.target as HTMLElement;
+      if (target.classList.contains("copilot-heading-link")) {
+        event.preventDefault();
+        const linkData = target.getAttribute("data-link");
+        if (linkData) {
+          app.workspace.openLinkText(linkData, "");
+        }
+      }
+    };
+
+    // Store the current ref value in a variable
+    const currentContentElement = contentRef.current;
+
+    // Add event listener to the content element
+    if (currentContentElement) {
+      currentContentElement.addEventListener("click", handleHeadingLinkClick);
+    }
+
+    // Cleanup function using the stored variable
+    return () => {
+      if (currentContentElement) {
+        currentContentElement.removeEventListener("click", handleHeadingLinkClick);
+      }
+    };
+  }, [app]);
 
   const adjustTextareaHeight = (element: HTMLTextAreaElement) => {
     element.style.height = "auto";

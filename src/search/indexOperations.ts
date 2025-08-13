@@ -1,13 +1,19 @@
-import { CHUNK_SIZE } from "@/constants";
 import EmbeddingsManager from "@/LLMProviders/embeddingManager";
 import { logError, logInfo } from "@/logger";
 import { RateLimiter } from "@/rateLimiter";
 import { getSettings, subscribeToSettingsChange } from "@/settings/model";
 import { formatDateTime } from "@/utils";
+import {
+  findAllWorkspaces,
+  WorkspaceInfo,
+  getWorkspaceConfigByInfo,
+  DEFAULT_WORKSPACE_CHUNK_SIZE,
+} from "@/utils/workspaceUtils";
 import { MD5 } from "crypto-js";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { App, Notice, TFile } from "obsidian";
 import { DBOperations } from "./dbOperations";
+import { preprocessMarkdownDocument } from "./markdownPreprocessor";
 import {
   extractAppIgnoreSettings,
   getDecodedPatterns,
@@ -90,18 +96,21 @@ export class IndexOperations {
         return 0;
       }
 
-      this.initializeIndexingState(files.length);
+      // 先准备chunks来获得实际要处理的文件数量
+      logInfo("Preparing chunks and filtering by workspace...");
+      const allChunks = await this.prepareAllChunks(files);
+      if (allChunks.length === 0) {
+        new Notice("No valid content to index (no files in workspaces).");
+        return 0;
+      }
+
+      // 统计实际要处理的文件数量
+      const actualFilesToProcess = new Set(allChunks.map((chunk) => chunk.fileInfo.path)).size;
+      this.initializeIndexingState(actualFilesToProcess);
       this.createIndexingNotice();
 
       // Clear the missing embeddings list before starting new indexing
       this.dbOps.clearFilesMissingEmbeddings();
-
-      // New: Prepare all chunks first
-      const allChunks = await this.prepareAllChunks(files);
-      if (allChunks.length === 0) {
-        new Notice("No valid content to index.");
-        return 0;
-      }
 
       // Process chunks in batches
       for (let i = 0; i < allChunks.length; i += this.embeddingBatchSize) {
@@ -142,6 +151,7 @@ export class IndexOperations {
                 embedding,
                 created_at: Date.now(),
                 nchars: chunk.content.length,
+                subtitle: chunk.subtitle || "/", // 确保subtitle字段始终有值
               });
               // Mark success for this file
               this.state.processedFiles.add(chunk.fileInfo.path);
@@ -194,6 +204,11 @@ export class IndexOperations {
             this.dbOps.checkIndexIntegrity().catch((err) => {
               logError("Background integrity check failed:", err);
             });
+
+            // 自动展示数据库内容
+            setTimeout(() => {
+              this.displayDatabaseContents();
+            }, 500);
           })
           .catch((err) => {
             logError("Background save failed:", err);
@@ -211,6 +226,7 @@ export class IndexOperations {
     Array<{
       content: string;
       fileInfo: any;
+      subtitle?: string;
     }>
   > {
     const embeddingInstance = await this.embeddingsManager.getEmbeddingsAPI();
@@ -220,14 +236,128 @@ export class IndexOperations {
     }
     const embeddingModel = EmbeddingsManager.getModelName(embeddingInstance);
 
-    const textSplitter = RecursiveCharacterTextSplitter.fromLanguage("markdown", {
-      chunkSize: CHUNK_SIZE,
-    });
-    const allChunks: Array<{ content: string; fileInfo: any }> = [];
+    // 获取所有工作区信息
+    const allWorkspaces: WorkspaceInfo[] = await findAllWorkspaces(this.app);
+    logInfo(`Found ${allWorkspaces.length} workspaces for indexing`);
+
+    // 辅助函数：确定文件属于哪个工作区
+    const getWorkspaceForFile = (filePath: string): WorkspaceInfo | null => {
+      // 按路径长度排序，最长的路径优先匹配（更具体的工作区优先）
+      const sortedWorkspaces = [...allWorkspaces].sort(
+        (a, b) => b.relativePath.length - a.relativePath.length
+      );
+
+      for (const workspace of sortedWorkspaces) {
+        if (workspace.relativePath === "/") {
+          // 根目录工作区：只有当文件直接在根目录且没有其他更具体的匹配时才匹配
+          // 检查文件是否在根目录下（不包含子目录）
+          if (!filePath.includes("/")) {
+            return workspace;
+          }
+        } else {
+          // 非根目录工作区：检查文件是否在此工作区路径下
+          if (filePath.startsWith(workspace.relativePath + "/")) {
+            return workspace;
+          }
+          // 检查是否是工作区目录本身的文件（如果有的话）
+          if (filePath === workspace.relativePath) {
+            return workspace;
+          }
+        }
+      }
+      return null;
+    };
+
+    // 缓存工作区配置和对应的文本分割器
+    const workspaceConfigCache = new Map<
+      string,
+      {
+        chunkSize: number;
+        textSplitter: RecursiveCharacterTextSplitter;
+        excludedPaths: string[];
+      }
+    >();
+
+    // 获取工作区配置的辅助函数
+    const getWorkspaceConfigData = async (workspace: WorkspaceInfo) => {
+      const cacheKey = workspace.relativePath;
+
+      if (workspaceConfigCache.has(cacheKey)) {
+        return workspaceConfigCache.get(cacheKey)!;
+      }
+
+      // 获取工作区配置
+      let chunkSize = DEFAULT_WORKSPACE_CHUNK_SIZE; // 默认chunk size
+      let excludedPaths: string[] = [];
+
+      try {
+        const workspaceConfig = await getWorkspaceConfigByInfo(this.app, workspace);
+        if (workspaceConfig?.chunk_size && workspaceConfig.chunk_size > 0) {
+          chunkSize = workspaceConfig.chunk_size;
+          logInfo(`Using custom chunk size ${chunkSize} for workspace ${workspace.name}`);
+        } else {
+          logInfo(`Using default chunk size ${chunkSize} for workspace ${workspace.name}`);
+        }
+
+        // 获取排除路径
+        if (workspaceConfig?.excludedPaths && Array.isArray(workspaceConfig.excludedPaths)) {
+          excludedPaths = workspaceConfig.excludedPaths;
+          logInfo(
+            `Found ${excludedPaths.length} excluded paths for workspace ${workspace.name}: ${excludedPaths.join(", ")}`
+          );
+        }
+      } catch (error) {
+        console.warn(
+          `Failed to load config for workspace ${workspace.name}, using default settings:`,
+          error
+        );
+      }
+
+      // 创建文本分割器
+      const textSplitter = RecursiveCharacterTextSplitter.fromLanguage("markdown", {
+        chunkSize: chunkSize,
+      });
+
+      // 缓存配置和分割器
+      const configData = { chunkSize, textSplitter, excludedPaths };
+      workspaceConfigCache.set(cacheKey, configData);
+
+      return configData;
+    };
+
+    const allChunks: Array<{ content: string; fileInfo: any; subtitle?: string }> = [];
 
     for (const file of files) {
+      // 跳过 data.md 配置文件，不进行向量化
+      if (file.name === "data.md") {
+        logInfo(`Skipping configuration file ${file.path} - not indexing data.md files`);
+        continue;
+      }
+
+      // 检查文件是否属于某个工作区
+      const fileWorkspace = getWorkspaceForFile(file.path);
+      if (!fileWorkspace) {
+        // 不在任何工作区中的文件跳过索引
+        logInfo(`Skipping file ${file.path} - not in any workspace`);
+        continue;
+      }
+
+      // 获取该工作区的配置数据
+      const workspaceConfigData = await getWorkspaceConfigData(fileWorkspace);
+
+      // 检查文件是否在排除列表中
+      if (workspaceConfigData.excludedPaths.includes(file.name)) {
+        logInfo(
+          `Skipping file ${file.path} - excluded by workspace ${fileWorkspace.name} (excludedPaths)`
+        );
+        continue;
+      }
+
       const content = await this.app.vault.cachedRead(file);
       if (!content?.trim()) continue;
+
+      // 获取该工作区对应的文本分割器
+      const textSplitter = workspaceConfigData.textSplitter;
 
       const fileCache = this.app.metadataCache.getFileCache(file);
       const fileInfo = {
@@ -238,6 +368,8 @@ export class IndexOperations {
         mtime: file.stat.mtime,
         tags: fileCache?.tags?.map((tag) => tag.tag) ?? [],
         extension: file.extension,
+        workspace_name: fileWorkspace.name,
+        workspace_path: fileWorkspace.relativePath,
         metadata: {
           ...(fileCache?.frontmatter ?? {}),
           created: formatDateTime(new Date(file.stat.ctime)).display,
@@ -245,23 +377,63 @@ export class IndexOperations {
         },
       };
 
-      // Add note title as contextual chunk headers
-      // https://js.langchain.com/docs/modules/data_connection/document_transformers/contextual_chunk_headers
-      const chunks = await textSplitter.createDocuments([content], [], {
-        chunkHeader: `\n\nNOTE TITLE: [[${fileInfo.title}]]\n\nMETADATA:${JSON.stringify(
-          fileInfo.metadata
-        )}\n\nNOTE BLOCK CONTENT:\n\n`,
-        appendChunkOverlapHeader: true,
-      });
+      // 首先进行markdown预分段处理
+      const markdownSections = preprocessMarkdownDocument(content);
 
-      chunks.forEach((chunk) => {
-        if (chunk.pageContent.trim()) {
-          allChunks.push({
-            content: chunk.pageContent,
-            fileInfo,
-          });
-        }
+      // 对每个section进行chunk分割
+      for (const section of markdownSections) {
+        // Add note title as contextual chunk headers
+        // https://js.langchain.com/docs/modules/data_connection/document_transformers/contextual_chunk_headers
+        const chunkHeader = `\n\nNOTE TITLE: [[${fileInfo.title}]]\n\nSUBTITLE: ${section.subtitle}\n\nMETADATA:${JSON.stringify(
+          fileInfo.metadata
+        )}\n\nNOTE BLOCK CONTENT:\n\n`;
+
+        const chunks = await textSplitter.createDocuments([section.content], [], {
+          chunkHeader,
+          appendChunkOverlapHeader: true,
+        });
+
+        chunks.forEach((chunk) => {
+          if (chunk.pageContent.trim()) {
+            allChunks.push({
+              content: chunk.pageContent,
+              fileInfo,
+              subtitle: section.subtitle,
+            });
+          }
+        });
+      }
+    }
+
+    // 输出每个工作区使用的chunk size信息
+    logInfo(`Workspace chunk size summary:`);
+    workspaceConfigCache.forEach((config, workspacePath) => {
+      logInfo(
+        `  - ${workspacePath}: ${config.chunkSize} (excluded: ${config.excludedPaths.length} files)`
+      );
+    });
+
+    logInfo(`Prepared ${allChunks.length} chunks from workspace files`);
+
+    // Debug模式下输出前两个分块的文本内容作为示例
+    if (getSettings().debug) {
+      console.log("=== DEBUG: Sample Chunks Content (showing first 2) ===");
+      allChunks.slice(0, 2).forEach((chunk, index) => {
+        console.log(`\n--- Chunk ${index + 1}/${allChunks.length} ---`);
+        console.log(`File: ${chunk.fileInfo.path}`);
+        console.log(
+          `Workspace: ${chunk.fileInfo.workspace_name} (${chunk.fileInfo.workspace_path})`
+        );
+        console.log(`Subtitle: ${chunk.subtitle || "/"}`);
+        console.log(`Length: ${chunk.content.length} characters`);
+        console.log("Content:");
+        console.log(chunk.content);
+        console.log("--- End of Chunk ---");
       });
+      if (allChunks.length > 2) {
+        console.log(`\n... 省略剩余 ${allChunks.length - 2} 个chunk ...`);
+      }
+      console.log("=== END DEBUG: Sample Chunks Content ===\n");
     }
 
     return allChunks;
@@ -269,6 +441,106 @@ export class IndexOperations {
 
   private getDocHash(sourceDocument: string): string {
     return MD5(sourceDocument).toString();
+  }
+
+  /**
+   * 展示数据库中所有文档的详细信息，包括workspace属性
+   */
+  public async displayDatabaseContents(): Promise<void> {
+    try {
+      const db = await this.dbOps.getDb();
+      if (!db) {
+        console.log("❌ 数据库未初始化");
+        new Notice("数据库未初始化，请先创建索引");
+        return;
+      }
+
+      const allDocuments = await DBOperations.getAllDocuments(db);
+
+      if (allDocuments.length === 0) {
+        console.log("📭 数据库为空，没有已索引的文档");
+        new Notice("数据库为空，没有已索引的文档");
+        return;
+      }
+
+      console.log(`\n🗃️  数据库内容展示 - 共 ${allDocuments.length} 个文档片段\n`);
+      console.log("=".repeat(80));
+
+      // 按工作区分组统计
+      const workspaceStats = new Map<string, number>();
+      const workspaceDetails = new Map<string, any[]>();
+
+      allDocuments.forEach((doc, index) => {
+        const workspaceName = doc.workspace_name || "未分配工作区";
+        const workspacePath = doc.workspace_path || "无路径";
+        const workspaceKey = `${workspaceName} (${workspacePath})`;
+
+        // 统计数量
+        workspaceStats.set(workspaceKey, (workspaceStats.get(workspaceKey) || 0) + 1);
+
+        // 收集详细信息
+        if (!workspaceDetails.has(workspaceKey)) {
+          workspaceDetails.set(workspaceKey, []);
+        }
+
+        workspaceDetails.get(workspaceKey)!.push({
+          index: index + 1,
+          id: doc.id,
+          title: doc.title,
+          path: doc.path,
+          subtitle: doc.subtitle || "/",
+          extension: doc.extension,
+          tags: doc.tags,
+          contentLength: doc.content?.length || 0,
+          embeddingModel: doc.embeddingModel,
+          created: new Date(doc.created_at).toLocaleString(),
+          modified: new Date(doc.mtime).toLocaleString(),
+        });
+      });
+
+      // 展示工作区统计
+      console.log("📊 工作区统计:");
+      workspaceStats.forEach((count, workspace) => {
+        console.log(`   ${workspace}: ${count} 个文档片段`);
+      });
+
+      console.log("\n" + "=".repeat(80));
+
+      // 展示每个工作区的详细信息（仅显示前2个文档作为示例）
+      workspaceDetails.forEach((docs, workspaceKey) => {
+        console.log(`\n📁 工作区: ${workspaceKey}`);
+        console.log("-".repeat(60));
+
+        const docsToShow = docs.slice(0, 2);
+        docsToShow.forEach((doc) => {
+          console.log(`
+  📄 [${doc.index}] ${doc.title}
+     📍 路径: ${doc.path}
+     📑 标题路径: ${doc.subtitle}
+     🔗 ID: ${doc.id.substring(0, 16)}...
+     📝 内容长度: ${doc.contentLength} 字符
+     🏷️  标签: ${doc.tags.join(", ") || "无"}
+     🤖 嵌入模型: ${doc.embeddingModel}
+     📅 创建时间: ${doc.created}
+     ✏️  修改时间: ${doc.modified}
+     📐 扩展名: ${doc.extension}`);
+        });
+
+        if (docs.length > 2) {
+          console.log(`\n  ... 省略剩余 ${docs.length - 2} 个文档 ...`);
+        }
+      });
+
+      console.log("\n" + "=".repeat(80));
+      console.log(`✅ 数据库内容展示完成 - 总计 ${allDocuments.length} 个文档片段`);
+
+      new Notice(
+        `数据库包含 ${allDocuments.length} 个文档片段，分布在 ${workspaceStats.size} 个工作区中`
+      );
+    } catch (error) {
+      console.error("❌ 展示数据库内容时出错:", error);
+      new Notice("展示数据库内容时出错，请查看控制台");
+    }
   }
 
   private async getFilesToIndex(overwrite?: boolean): Promise<TFile[]> {
@@ -564,6 +836,7 @@ export class IndexOperations {
           embedding: embeddings[i],
           created_at: Date.now(),
           nchars: chunk.content.length,
+          subtitle: chunk.subtitle || "/", // 确保subtitle字段始终有值
         });
       }
 

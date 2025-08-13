@@ -23,7 +23,8 @@ import { ToolManager } from "@/tools/toolManager";
 import {
   err2String,
   extractChatHistory,
-  extractUniqueTitlesFromDocs,
+  // extractUniqueTitlesFromDocs,
+  extractUniqueLinksFromDocs,
   extractYoutubeUrl,
   formatDateTime,
   getApiErrorMessage,
@@ -39,6 +40,7 @@ import ProjectManager from "./projectManager";
 class ThinkBlockStreamer {
   private hasOpenThinkBlock = false;
   private fullResponse = "";
+  private ttsIndex = 0; // 添加TTS索引计数器
 
   constructor(private updateCurrentAiMessage: (message: string) => void) {}
 
@@ -65,10 +67,13 @@ class ThinkBlockStreamer {
     return false; // No thinking chunk handled
   }
 
-  private handleDeepseekChunk(chunk: any) {
+  private async handleDeepseekChunk(chunk: any) {
     // Handle standard string content
     if (typeof chunk.content === "string") {
       this.fullResponse += chunk.content;
+
+      // 发送文本到aloud插件进行TTS播放
+      await this.sendTextToTTS(chunk.content);
     }
 
     // Handle deepseek reasoning/thinking content
@@ -78,12 +83,71 @@ class ThinkBlockStreamer {
         this.hasOpenThinkBlock = true;
       }
       this.fullResponse += chunk.additional_kwargs.reasoning_content;
+      // 根据设置判断是否播放思考内容
+      await this.sendThinkingToTTS(chunk.additional_kwargs.reasoning_content);
       return true; // Indicate we handled a thinking chunk
     }
     return false; // No thinking chunk handled
   }
 
-  processChunk(chunk: any) {
+  // 添加发送思考内容到TTS的方法
+  private async sendThinkingToTTS(thinkingContent: string) {
+    // 获取设置判断是否播放思考内容
+    const settings = getSettings();
+    if (settings.promptEnhancements?.autoSpeech?.speakThinkContent) {
+      await this.sendTextToTTS(thinkingContent);
+    }
+  }
+
+  // 添加发送文本到TTS插件的方法
+  private async sendTextToTTS(text: string) {
+    if (!text) return;
+    
+    try {
+      // 获取设置判断是否启用自动语音播放
+      const settings = getSettings();
+      if (!settings.promptEnhancements?.autoSpeech?.enabled) {
+        return;
+      }
+
+      // 获取aloud插件实例
+      const ttsPlugin = (window as any).app?.plugins?.getPlugin("aloud-tts-ai-learning-assistant");
+      if (ttsPlugin?.ttsService?.playStreamText) {
+         // 直接发送文本，不分块
+        await ttsPlugin.ttsService.playStreamText({
+          index: this.ttsIndex++,
+          length: text.length,
+          text: text
+        });
+      }
+    } catch (error) {
+      console.warn("Failed to send text to TTS plugin:", error);
+    }
+  }
+
+  // 添加结束TTS流的方法
+  private async finishTTSStream() {
+    try {
+      // 获取设置判断是否启用自动语音播放
+      const settings = getSettings();
+      if (!settings.promptEnhancements?.autoSpeech?.enabled) {
+        return;
+      }
+
+      const ttsPlugin = (window as any).app?.plugins?.getPlugin("aloud-tts-ai-learning-assistant");
+      if (ttsPlugin?.ttsService?.playStreamText) {
+        // 发送结束信号
+        await ttsPlugin.ttsService.playStreamText({
+          index: this.ttsIndex++,
+          length: 0,
+          text: ""
+        });
+      }
+    } catch (error) {
+      console.warn("Failed to finish TTS stream:", error);
+    }
+  }
+  async processChunk(chunk: any) {
     let handledThinking = false;
 
     // Handle Claude 3.7 array-based content
@@ -91,7 +155,7 @@ class ThinkBlockStreamer {
       handledThinking = this.handleClaude37Chunk(chunk.content);
     } else {
       // Handle deepseek format
-      handledThinking = this.handleDeepseekChunk(chunk);
+      handledThinking = await this.handleDeepseekChunk(chunk);
     }
 
     // Close think block if we have one open and didn't handle thinking content
@@ -103,12 +167,16 @@ class ThinkBlockStreamer {
     this.updateCurrentAiMessage(this.fullResponse);
   }
 
-  close() {
+  async close() {
     // Make sure to close any open think block at the end
     if (this.hasOpenThinkBlock) {
       this.fullResponse += "</think>";
       this.updateCurrentAiMessage(this.fullResponse);
     }
+
+    // 结束TTS流
+    await this.finishTTSStream();
+
     return this.fullResponse;
   }
 }
@@ -315,7 +383,7 @@ class LLMChainRunner extends BaseChainRunner {
     }
 
     // Always return the response, even if partial
-    const response = streamer.close();
+    const response = await streamer.close();
 
     // Only skip saving if it's a new chat (clearing everything)
     if (abortController.signal.aborted && abortController.signal.reason === ABORT_REASON.NEW_CHAT) {
@@ -433,7 +501,8 @@ class VaultQAChainRunner extends BaseChainRunner {
           logInfo("VaultQA stream iteration aborted", { reason: abortController.signal.reason });
           break;
         }
-        streamer.processChunk(chunk);
+        // 修改为 await 调用
+        await streamer.processChunk(chunk);
       }
     } catch (error: any) {
       // Check if the error is due to abort signal
@@ -446,7 +515,7 @@ class VaultQAChainRunner extends BaseChainRunner {
     }
 
     // Always get the response, even if partial
-    let fullAIResponse = streamer.close();
+    let fullAIResponse = await streamer.close();
 
     // Only skip saving if it's a new chat (clearing everything)
     if (abortController.signal.aborted && abortController.signal.reason === ABORT_REASON.NEW_CHAT) {
@@ -467,9 +536,9 @@ class VaultQAChainRunner extends BaseChainRunner {
   }
 
   private addSourcestoResponse(response: string): string {
-    const docTitles = extractUniqueTitlesFromDocs(this.chainManager.getRetrievedDocuments());
-    if (docTitles.length > 0) {
-      const links = docTitles.map((title) => `- [[${title}]]`).join("\n");
+    const docLinks = extractUniqueLinksFromDocs(this.chainManager.getRetrievedDocuments());
+    if (docLinks.length > 0) {
+      const links = docLinks.map((link) => `- ${link}`).join("\n");
       response += "\n\n#### Sources:\n\n" + links;
     }
     return response;

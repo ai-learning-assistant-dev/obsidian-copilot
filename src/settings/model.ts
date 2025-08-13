@@ -152,13 +152,14 @@ export interface CopilotSettings {
       enabled?: boolean;
       prompt?: string;
       useOralPrompt?: boolean;
+      speakThinkContent?: boolean; // 新增是否播放 think 部分内容
     };
     appendDefaultPrompt?: boolean; // 新增是否拼接默认系统提示词
   };
 }
 
 // 用于人设列表
-interface CharacterPresetItem {
+export interface CharacterPresetItem {
   id: string;
   name: string;
   prompt: string;
@@ -338,7 +339,7 @@ export function getComposerOutputPrompt(): string {
 export function getSystemPrompt(): string {
   const settings = getSettings();
   const userPrompt = settings.userSystemPrompt;
-  let basePrompt = DEFAULT_SYSTEM_PROMPT;
+  const basePrompt = DEFAULT_SYSTEM_PROMPT;
   let customInstructions = "";
 
   // 收集所有需要放入user_custom_instructions的内容
@@ -367,16 +368,20 @@ export function getSystemPrompt(): string {
   // 根据是否拼接默认提示词进行判断
   if (settings.promptEnhancements?.appendDefaultPrompt === false) {
     // 不拼接默认提示词
-    return customInstructions ? `
+    return customInstructions
+      ? `
 <user_custom_instructions>
 ${customInstructions}
-</user_custom_instructions>` : "";
+</user_custom_instructions>`
+      : "";
   } else {
     // 拼接默认提示词
-    return customInstructions ? `${basePrompt}
+    return customInstructions
+      ? `${basePrompt}
 <user_custom_instructions>
 ${customInstructions}
-</user_custom_instructions>` : basePrompt;
+</user_custom_instructions>`
+      : basePrompt;
   }
 }
 

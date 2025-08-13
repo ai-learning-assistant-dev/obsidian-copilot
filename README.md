@@ -313,3 +313,58 @@ Copilot Plus is a premium product of Brevilabs LLC and it is not affiliated with
 ## **Authors**
 
 Brevilabs Team | Email: logan@brevilabs.com | X/Twitter: [@logancyang](https://twitter.com/logancyang)
+
+## 项目代码结构说明
+
+本项目是为 Obsidian 开发的 AI 助手插件，采用 TypeScript 编写，使用 React 构建用户界面。以下是项目的主要代码结构：
+
+### 核心模块
+
+- **src/main.ts**: 插件入口文件，定义了CopilotPlugin类，负责初始化插件、注册视图、命令和事件监听器
+- **src/components/**: 包含所有 React UI 组件，包括聊天界面、设置页面、模态框等
+  - **chat-components/**: 聊天界面专用组件
+  - **modals/**: 各类弹窗组件
+  - **ui/**: 通用 UI 组件
+- **src/LLMProviders/**: 大语言模型提供商相关代码
+  - 支持多种 AI 模型（OpenAI、Anthropic、Google Gemini 等）
+  - 管理模型连接、提示词、记忆等功能
+- **src/settings/**: 插件设置相关代码
+  - 设置界面和配置管理
+  - 各种 AI 模型的配置选项
+
+### 功能模块
+
+- **src/commands/**: 命令系统实现
+  - 自定义命令管理
+  - 上下文菜单功能
+  - 命令迁移工具
+- **src/search/**: 搜索和检索功能
+  - 向量存储管理
+  - 相关笔记查找
+  - 混合检索器实现
+- **src/autocomplete/**: 自动补全功能
+- **src/asr/**: 语音识别功能（ASR）
+  - 音频录制和转录
+  - 状态栏控件
+- **src/cache/**: 缓存管理
+- **src/tools/**: 工具函数和实用程序
+- **src/utils/**: 通用工具函数
+
+### 数据和存储
+
+- **VectorStoreManager**: 向量数据库管理
+- **SharedState**: 共享状态管理
+- **EncryptionService**: 加密服务
+- **FileParserManager**: 文件解析管理器
+
+### 技术栈
+
+- **语言**: TypeScript
+- **框架**: React + Obsidian API
+- **构建工具**: esbuild + TypeScript Compiler
+- **样式**: Tailwind CSS
+- **测试**: Jest
+- **主要依赖**:
+  - Langchain 相关库（用于 AI 集成）
+  - Radix UI（用于 UI 组件）
+  - Tailwind CSS 及相关工具

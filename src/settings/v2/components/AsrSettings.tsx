@@ -83,185 +83,195 @@ const AsrSetting: React.FC<{ plugin: CopilotPlugin }> = ({ plugin }) => {
   };
 
   return (
-    <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-w-3xl mx-auto">
-      <h2 className="text-xl font-semibold text-gray-800 border-b pb-3">
+    <div className="tw-mx-auto tw-max-w-3xl tw-rounded-lg tw-border tw-border-border tw-p-4">
+      <h2 className="tw-border-b tw-border-border tw-pb-2 tw-text-xl tw-font-semibold">
         Settings for Transcription
       </h2>
+
       {/* 服务类型设置 */}
-      <div className="bg-gray-50 p-4 rounded-md">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="text-gray-700 font-medium">Service Type</span>
-            <label className="relative inline-flex items-center cursor-pointer">
+      <div className="tw-mt-4 tw-rounded-md tw-p-4">
+        <div className="tw-flex tw-flex-col tw-justify-between tw-gap-4 md:tw-flex-row md:tw-items-center">
+          <div className="tw-flex tw-items-center tw-gap-3">
+            <span className="tw-text-sm tw-font-medium">Service Type</span>
+            <label className="tw-relative tw-inline-flex tw-cursor-pointer tw-items-center">
               <input
                 type="checkbox"
                 checked={plugin.asrSettings.Asr_useLocalService}
                 onChange={(e) => handleToggleChange("Asr_useLocalService")(e.target.checked)}
-                className="sr-only peer"
-              ></input>
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                className="tw-peer tw-sr-only"
+              />
+              <div className="tw-peer-checked:tw-after:tw-translate-x-full  tw-peer tw-h-6 tw-w-11 tw-rounded-full after:tw-absolute after:tw-left-[2px] after:tw-top-[2px] after:tw-size-5 after:tw-rounded-full after:tw-border after:tw-border-border after:tw-transition-all after:tw-content-[''] peer-focus:tw-outline-none peer-focus:tw-ring-2 peer-focus:tw-ring-ring"></div>
             </label>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600">Currently using:</span>
-            <span
-              className="px-3 py-1 rounded-full text-xs font-medium
-                   {settings.Asr_useLocalService ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}"
-            >
+          <div className="tw-flex tw-items-center tw-gap-3">
+            <span className="tw-text-sm">Currently using:</span>
+            <span className={"tw-rounded-full tw-px-2 tw-py-1 tw-text-xs tw-font-medium"}>
               {plugin.asrSettings.Asr_useLocalService ? "Local Service" : "OpenAI API"}
             </span>
           </div>
         </div>
 
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="tw-mt-2 tw-text-xs">
           Toggle to switch between OpenAI API or your local Whisper service
         </p>
-        <div className="form-group">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Transcription engine
-          </label>
-          <div className="relative">
+        <div className="tw-space-y-2">
+          <label className="tw-block tw-text-sm tw-font-medium">Transcription engine</label>
+          <div className="tw-relative">
             <select
               value={plugin.asrSettings.Asr_transcriptionEngine}
               onChange={(e) => saveSetting({ Asr_transcriptionEngine: e.target.value })}
-              className="w-full px-4 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+              className="tw-min-h-[35px] tw-w-full tw-appearance-none tw-rounded-md tw-border tw-px-3 tw-py-2 tw-text-sm focus:tw-ring-2 focus:tw-ring-ring"
             >
               <option value="whisper_asr">Whisper ASR (Self-hosted)</option>
             </select>
-            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-              <i className="fa fa-chevron-down text-gray-400"></i>
+            <div className="tw-pointer-events-none tw-absolute tw-inset-y-0 tw-right-0 tw-flex tw-items-center tw-px-2">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="tw-text-base"
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
             </div>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-            Whisper ASR requires local Python setup.
-          </p>
+          <p className="tw-text-xs">Whisper ASR requires local Python setup.</p>
         </div>
       </div>
       {/* API 设置组 */}
-      <div className="bg-gray-50 p-4 rounded-md">
-        <h3 className="text-lg font-medium text-gray-700 mb-3">API Settings</h3>
+      <div className="tw-rounded-md tw-p-4">
+        <h3 className="tw-mb-3 tw-text-lg tw-font-medium">API Settings</h3>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4 items-center">
-            <label className="text-gray-700 font-medium">API Key</label>
+        <div className="tw-space-y-4">
+          <div className="tw-grid tw-grid-cols-1 tw-items-center tw-gap-4 md:tw-grid-cols-3">
+            <label className="tw-text-sm tw-font-medium">API Key</label>
             <input
               type="text"
               placeholder="sk-...xxxx"
               value={plugin.asrSettings.Asr_apiKey}
               onChange={(e) => handleTextChange("Asr_apiKey")(e.target.value)}
-              className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="tw-col-span-2 tw-rounded-md tw-border tw-p-2 tw-text-sm focus:tw-ring-2 focus:tw-ring-ring"
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4 items-center">
-            <label className="text-gray-700 font-medium">API URL</label>
+          <div className="tw-grid tw-grid-cols-1 tw-items-center tw-gap-4 md:tw-grid-cols-3">
+            <label className="tw-text-sm tw-font-medium">API URL</label>
             <input
               type="text"
               placeholder="https://api.your-custom-url.com"
               value={plugin.asrSettings.Asr_apiUrl}
               onChange={(e) => handleTextChange("Asr_apiUrl")(e.target.value)}
-              className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="tw-col-span-2 tw-rounded-md tw-border tw-p-2 tw-text-sm focus:tw-ring-2 focus:tw-ring-ring"
             />
           </div>
         </div>
       </div>
       {/* 本地服务设置组 */}
-      <div className="bg-gray-50 p-4 rounded-md">
-        <h3 className="text-lg font-medium text-gray-700 mb-3">Local Service Settings</h3>
+      <div className="tw-rounded-md tw-p-4">
+        <h3 className="tw-mb-3 tw-text-lg tw-font-medium">Local Service Settings</h3>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4 items-center">
-            <label className="text-gray-700 font-medium">Local Service URL</label>
+        <div className="tw-space-y-4">
+          {/* 本地服务URL输入 */}
+          <div className="tw-grid tw-grid-cols-1 tw-items-center tw-gap-4 md:tw-grid-cols-3">
+            <label className="tw-text-sm tw-font-medium">Local Service URL</label>
             <input
               type="text"
               placeholder={DEFAULT_SETTINGS.Asr_localServiceUrl}
               value={plugin.asrSettings.Asr_localServiceUrl}
-              onChange={(e) => {
-                handleTextChange("Asr_localServiceUrl")(e.target.value);
-              }}
-              className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => handleTextChange("Asr_localServiceUrl")(e.target.value)}
+              className="tw-col-span-2 tw-rounded-md tw-border tw-p-2 tw-text-sm focus:tw-ring-2 focus:tw-ring-ring"
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4 items-center">
-            <label className="text-gray-700 font-medium">Encode Audio</label>
-            <div className="col-span-2 flex items-center gap-3">
+          {/* 音频编码复选框 */}
+          <div className="tw-grid tw-grid-cols-1 tw-items-center tw-gap-4 md:tw-grid-cols-3">
+            <label className="tw-text-sm tw-font-medium">Encode Audio</label>
+            <div className="tw-col-span-2 tw-flex tw-items-center tw-gap-3">
               <input
                 type="checkbox"
                 checked={plugin.asrSettings.Asr_encode}
                 onChange={(e) => handleToggleChange("Asr_encode")(e.target.checked)}
-                className="h-4 w-4 text-blue-500 rounded border-gray-300 focus:ring-blue-500"
+                className="tw-size-4 tw-rounded focus:tw-ring-ring"
               />
-              <span className="text-sm text-gray-600">Enable audio encoding for local service</span>
+              <span className="tw-text-sm">Enable audio encoding for local service</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 items-center">
-            <label className="text-gray-700 font-medium">VAD Filter</label>
-            <div className="col-span-2 flex items-center gap-3">
+          {/* VAD过滤器复选框 */}
+          <div className="tw-grid tw-grid-cols-1 tw-items-center tw-gap-4 md:tw-grid-cols-3">
+            <label className="tw-text-sm tw-font-medium">VAD Filter</label>
+            <div className="tw-col-span-2 tw-flex tw-items-center tw-gap-3">
               <input
                 type="checkbox"
                 checked={plugin.asrSettings.Asr_vadFilter}
                 onChange={(e) => handleToggleChange("Asr_vadFilter")(e.target.checked)}
-                className="h-4 w-4 text-blue-500 rounded border-gray-300 focus:ring-blue-500"
+                className="tw-size-4 tw-rounded focus:tw-ring-ring"
               />
-              <span className="text-sm text-gray-600">Enable Voice Activity Detection filter</span>
+              <span className="tw-text-sm">Enable Voice Activity Detection filter</span>
             </div>
           </div>
         </div>
       </div>
       {/* 文件保存设置组 */}
-      <div className="bg-gray-50 p-4 rounded-md">
-        <h3 className="text-lg font-medium text-gray-700 mb-3">File Saving Settings</h3>
+      <div className="tw-rounded-md tw-p-4">
+        <h3 className="tw-mb-3 tw-text-lg tw-font-medium">File Saving Settings</h3>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4 items-center">
-            <label className="text-gray-700 font-medium">Save recording</label>
-            <div className="col-span-2 flex items-center gap-3">
+        <div className="tw-space-y-4">
+          {/* 保存录音设置 */}
+          <div className="tw-grid tw-grid-cols-1 tw-items-center tw-gap-4 md:tw-grid-cols-3">
+            <label className="tw-text-sm tw-font-medium">Save recording</label>
+            <div className="tw-col-span-2 tw-flex tw-items-center tw-gap-3">
               <input
                 type="checkbox"
                 checked={plugin.asrSettings.Asr_saveAudioFile}
                 onChange={(e) => handleToggleChange("Asr_saveAudioFile")(e.target.checked)}
-                className="h-4 w-4 text-blue-500 rounded border-gray-300 focus:ring-blue-500"
+                className="tw-size-4 tw-rounded focus:tw-ring-ring"
               />
-              <span className="text-sm text-gray-600">
+              <span className="tw-text-sm">
                 Turn on to save the audio file after sending it to the Whisper API
               </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 items-center">
-            <label className="text-gray-700 font-medium">Recordings folder</label>
+          {/* 录音文件夹设置 */}
+          <div className="tw-grid tw-grid-cols-1 tw-items-center tw-gap-4 md:tw-grid-cols-3">
+            <label className="tw-text-sm tw-font-medium">Recordings folder</label>
             <input
               type="text"
               placeholder="Example: folder/audio"
               value={plugin.asrSettings.Asr_saveAudioFilePath}
               onChange={(e) => handleTextChange("Asr_saveAudioFilePath")(e.target.value)}
               disabled={!plugin.asrSettings.Asr_saveAudioFile}
-              className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="tw-col-span-2 tw-rounded-md tw-border tw-p-2 tw-text-sm focus:tw-ring-2 focus:tw-ring-ring disabled:tw-cursor-not-allowed disabled:tw-opacity-50"
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4 items-center">
-            <label className="text-gray-700 font-medium">Save transcription</label>
-            <div className="col-span-2 flex items-center gap-3">
+          {/* 保存转录文本设置 */}
+          <div className="tw-grid tw-grid-cols-1 tw-items-center tw-gap-4 md:tw-grid-cols-3">
+            <label className="tw-text-sm tw-font-medium">Save transcription</label>
+            <div className="tw-col-span-2 tw-flex tw-items-center tw-gap-3">
               <input
                 type="checkbox"
                 checked={plugin.asrSettings.Asr_createNewFileAfterRecording}
                 onChange={(e) =>
                   handleToggleChange("Asr_createNewFileAfterRecording")(e.target.checked)
                 }
-                className="h-4 w-4 text-blue-500 rounded border-gray-300 focus:ring-blue-500"
+                className="tw-size-4 tw-rounded focus:tw-ring-ring"
               />
-              <span className="text-sm text-gray-600">
-                Turn on to create a new file for each recording
-              </span>
+              <span className="tw-text-sm">Turn on to create a new file for each recording</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 items-center">
-            <label className="text-gray-700 font-medium">Transcriptions folder</label>
+          {/* 转录文本文件夹设置 */}
+          <div className="tw-grid tw-grid-cols-1 tw-items-center tw-gap-4 md:tw-grid-cols-3">
+            <label className="tw-text-sm tw-font-medium">Transcriptions folder</label>
             <input
               type="text"
               placeholder="Example: folder/note"
@@ -270,29 +280,48 @@ const AsrSetting: React.FC<{ plugin: CopilotPlugin }> = ({ plugin }) => {
                 handleTextChange("Asr_createNewFileAfterRecordingPath")(e.target.value)
               }
               disabled={!plugin.asrSettings.Asr_createNewFileAfterRecording}
-              className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="tw-col-span-2 tw-rounded-md tw-border tw-p-2 tw-text-sm focus:tw-ring-2 focus:tw-ring-ring disabled:tw-cursor-not-allowed disabled:tw-opacity-50"
             />
           </div>
         </div>
       </div>
       {/* General Settings Section */}
-      <section className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-5">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
-          <i className="fa fa-sliders mr-2 text-blue-500"></i> General Settings
+      <section className="tw-rounded-lg tw-p-5">
+        <h3 className="tw-mb-4 tw-flex tw-items-center tw-text-lg tw-font-semibold">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="tw-mr-2"
+          >
+            <line x1="4" y1="21" x2="4" y2="14"></line>
+            <line x1="4" y1="10" x2="4" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12" y2="3"></line>
+            <line x1="20" y1="21" x2="20" y2="16"></line>
+            <line x1="20" y1="12" x2="20" y2="3"></line>
+            <line x1="1" y1="14" x2="7" y2="14"></line>
+            <line x1="9" y1="8" x2="15" y2="8"></line>
+            <line x1="17" y1="16" x2="23" y2="16"></line>
+          </svg>
+          General Settings
         </h3>
 
-        <div className="grid grid-cols-1 gap-4">
-          <div className="form-group">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Language
-            </label>
-            <div className="relative">
+        <div className="tw-space-y-4">
+          {/* Language Selector */}
+          <div className="tw-space-y-1">
+            <label className="tw-block tw-text-sm tw-font-medium">Language</label>
+            <div className="tw-relative">
               <select
                 value={plugin.asrSettings.Asr_language}
-                onChange={(e) => {
-                  saveSetting({ Asr_language: e.target.value });
-                }}
-                className="w-full px-4 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                onChange={(e) => saveSetting({ Asr_language: e.target.value })}
+                className="tw-min-h-[35px] tw-w-full tw-rounded-md tw-border tw-p-2 tw-text-sm focus:tw-ring-2 focus:tw-ring-ring"
               >
                 <option value="auto">Auto-detect</option>
                 {Object.entries(LANGUAGES).map(([key, value]) => (
@@ -301,94 +330,120 @@ const AsrSetting: React.FC<{ plugin: CopilotPlugin }> = ({ plugin }) => {
                   </option>
                 ))}
               </select>
-              <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                <i className="fa fa-chevron-down text-gray-400"></i>
+              <div className="tw-pointer-events-none tw-absolute tw-inset-y-0 tw-right-0 tw-flex tw-items-center tw-px-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="tw-text-base"
+                >
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
               </div>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-              Automatically detected if not specified
-            </p>
+            <p className="tw-text-xs">Automatically detected if not specified</p>
           </div>
 
-          <div className="form-group">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Line Spacing
-            </label>
-            <div className="relative">
+          {/* Line Spacing Selector */}
+          <div className="tw-space-y-1">
+            <label className="tw-block tw-text-sm tw-font-medium">Line Spacing</label>
+            <div className="tw-relative">
               <select
                 value={plugin.asrSettings.Asr_lineSpacing}
                 onChange={(e) => saveSetting({ Asr_lineSpacing: e.target.value })}
-                className="w-full px-4 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                className="tw-min-h-[35px] tw-w-full tw-rounded-md tw-border tw-p-2 tw-text-sm focus:tw-ring-2 focus:tw-ring-ring"
               >
                 <option value="multi">Multi-line</option>
                 <option value="single">Single-line</option>
               </select>
-              <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                <i className="fa fa-chevron-down text-gray-400"></i>
+              <div className="tw-pointer-events-none tw-absolute tw-inset-y-0 tw-right-0 tw-flex tw-items-center tw-px-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="tw-text-base"
+                >
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
               </div>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-              Formatting for the transcribed text output
-            </p>
+            <p className="tw-text-xs">Formatting for the transcribed text output</p>
           </div>
 
-          <div className="form-group">
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Enable timestamps
-              </label>
-              <div className="relative inline-block w-10 mr-2 align-middle select-none">
-                <input
-                  type="checkbox"
-                  checked={plugin.asrSettings.Asr_timestamps}
-                  onChange={(e) => saveSetting({ Asr_timestamps: e.target.checked })}
-                  className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-gray-300 appearance-none cursor-pointer transition-transform duration-200 ease-in transform translate-x-0 checked:translate-x-4 checked:border-blue-500"
-                />
-                <label
-                  htmlFor="toggle"
-                  className="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer checked:bg-blue-500"
-                ></label>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className={`form-group ${plugin.asrSettings.Asr_timestamps ? "" : "opacity-50 pointer-events-none"}`}
-          >
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Timestamp format
+          {/* Enable Timestamps Toggle */}
+          <div className="tw-flex tw-items-center tw-justify-between tw-py-2">
+            <label className="tw-text-sm tw-font-medium">Enable timestamps</label>
+            <label className="tw-relative tw-inline-flex tw-cursor-pointer tw-items-center">
+              <input
+                type="checkbox"
+                checked={plugin.asrSettings.Asr_timestamps}
+                onChange={(e) => saveSetting({ Asr_timestamps: e.target.checked })}
+                className="tw-peer tw-sr-only"
+              />
+              <div className="tw-peer-checked:tw-after:tw-translate-x-full tw-peer tw-h-6 tw-w-11 tw-rounded-full after:tw-absolute after:tw-left-[2px] after:tw-top-[2px] after:tw-size-5 after:tw-rounded-full after:tw-border after:tw-border-border after:tw-transition-all after:tw-content-[''] peer-focus:tw-outline-none peer-focus:tw-ring-2 peer-focus:tw-ring-ring"></div>
             </label>
-            <div className="relative">
+          </div>
+
+          {/* Timestamp Format */}
+          <div
+            className={`tw-space-y-1 ${!plugin.asrSettings.Asr_timestamps ? "tw-pointer-events-none tw-opacity-50" : ""}`}
+          >
+            <label className="tw-block tw-text-sm tw-font-medium">Timestamp format</label>
+            <div className="tw-relative">
               <select
                 value={plugin.asrSettings.Asr_timestampFormat}
                 onChange={(e) => saveSetting({ Asr_timestampFormat: e.target.value })}
-                className="w-full px-4 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                className="tw-min-h-[35px] tw-w-full tw-rounded-md tw-border tw-p-2 tw-text-sm focus:tw-ring-2 focus:tw-ring-ring"
+                disabled={!plugin.asrSettings.Asr_timestamps}
               >
                 <option value="auto">Auto (Shortest format)</option>
                 <option value="HH:mm:ss">HH:mm:ss</option>
                 <option value="mm:ss">mm:ss</option>
                 <option value="ss">ss</option>
               </select>
-              <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                <i className="fa fa-chevron-down text-gray-400"></i>
+              <div className="tw-pointer-events-none tw-absolute tw-inset-y-0 tw-right-0 tw-flex tw-items-center tw-px-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="tw-text-base"
+                >
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
               </div>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-              Format for timestamp markers in the transcription
-            </p>
+            <p className="tw-text-xs">Format for timestamp markers in the transcription</p>
           </div>
 
+          {/* Timestamp Interval */}
           <div
-            className={`form-group ${plugin.asrSettings.Asr_timestamps ? "" : "opacity-50 pointer-events-none"}`}
+            className={`tw-space-y-1 ${!plugin.asrSettings.Asr_timestamps ? "tw-pointer-events-none tw-opacity-50" : ""}`}
           >
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Timestamp interval
-            </label>
-            <div className="relative">
+            <label className="tw-block tw-text-sm tw-font-medium">Timestamp interval</label>
+            <div className="tw-relative">
               <select
                 value={plugin.asrSettings.Asr_timestampInterval}
                 onChange={(e) => saveSetting({ Asr_timestampInterval: e.target.value })}
-                className="w-full px-4 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                className="tw-min-h-[35px] tw-w-full tw-rounded-md tw-border tw-p-2 tw-text-sm focus:tw-ring-2 focus:tw-ring-ring"
+                disabled={!plugin.asrSettings.Asr_timestamps}
               >
                 <option value="0">Off</option>
                 <option value="5">Every 5 seconds</option>
@@ -398,13 +453,24 @@ const AsrSetting: React.FC<{ plugin: CopilotPlugin }> = ({ plugin }) => {
                 <option value="30">Every 30 seconds</option>
                 <option value="60">Every minute</option>
               </select>
-              <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                <i className="fa fa-chevron-down text-gray-400"></i>
+              <div className="tw-pointer-events-none tw-absolute tw-inset-y-0 tw-right-0 tw-flex tw-items-center tw-px-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="tw-text-base"
+                >
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
               </div>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-              How often to insert timestamp markers
-            </p>
+            <p className="tw-text-xs">How often to insert timestamp markers</p>
           </div>
         </div>
       </section>
