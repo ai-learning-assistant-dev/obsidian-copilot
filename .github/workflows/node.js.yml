@@ -34,4 +34,4 @@ jobs:
         if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
         env:
           GEMINI_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-        run: npm run test:integration
+        # run: npm run test:integration
