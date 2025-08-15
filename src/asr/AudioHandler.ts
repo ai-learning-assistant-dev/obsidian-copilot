@@ -2,6 +2,7 @@ import axios from "axios";
 import Whisper from "@/main";
 import { Notice, MarkdownView, requestUrl } from "obsidian";
 import { getBaseFileName, payloadGenerator } from "../utils";
+import { DEFAULT_SETTINGS } from "@/constants";
 
 export class AudioHandler {
   private plugin: Whisper;
@@ -188,7 +189,12 @@ export class AudioHandler {
     if (Asr_language !== "en") args += `&language=${Asr_language}`;
     if (Asr_prompt) args += `&initial_prompt=${Asr_prompt}`;
 
-    const urls = this.plugin.asrSettings.Asr_localServiceUrl.split(";").filter(Boolean);
+
+    // 修复：确保 Asr_localServiceUrl 存在且为字符串，如果不存在则使用默认值
+    const localServiceUrl = this.plugin.asrSettings.Asr_localServiceUrl || DEFAULT_SETTINGS.Asr_localServiceUrl;
+    const urls = localServiceUrl.split(";").filter(Boolean);
+
+    // const urls = this.plugin.asrSettings.Asr_localServiceUrl.split(";").filter(Boolean);
 
     for (const baseUrl of urls) {
       const url = `${baseUrl}/asr?${args}`;

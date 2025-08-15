@@ -116,7 +116,10 @@ export class TranscriptionEngine {
     if (Asr_vadFilter !== DEFAULT_SETTINGS.Asr_vadFilter) args += `&vad_filter=${Asr_vadFilter}`;
     if (Asr_language !== DEFAULT_SETTINGS.Asr_language) args += `&language=${Asr_language}`;
 
-    const urls = this.plugin.asrSettings.Asr_localServiceUrl.split(";").filter(Boolean); // Remove empty strings
+    // 修复：确保 Asr_localServiceUrl 存在且为字符串，如果不存在则使用默认值
+    const localServiceUrl = this.plugin.asrSettings.Asr_localServiceUrl || DEFAULT_SETTINGS.Asr_localServiceUrl;
+    const urls = localServiceUrl.split(";").filter(Boolean);
+    // const urls = this.plugin.asrSettings.Asr_localServiceUrl.split(";").filter(Boolean); // Remove empty strings
 
     for (const baseUrl of urls) {
       const url = `${baseUrl}/asr?${args}`;
