@@ -20,6 +20,7 @@ import {
   getMatchingPatterns,
   shouldIndexFile,
 } from "./searchUtils";
+import { workspaceManager } from "@/utils/workspaceUtils";
 
 export interface IndexingState {
   isIndexingPaused: boolean;
@@ -237,8 +238,21 @@ export class IndexOperations {
     const embeddingModel = EmbeddingsManager.getModelName(embeddingInstance);
 
     // 获取所有工作区信息
-    const allWorkspaces: WorkspaceInfo[] = await findAllWorkspaces(this.app);
-    logInfo(`Found ${allWorkspaces.length} workspaces for indexing`);
+    // const allWorkspaces: WorkspaceInfo[] = await findAllWorkspaces(this.app);
+    
+    const currentWorkspaceInfo = workspaceManager.getCurrentWorkspaceInfo(); 
+    
+    let allWorkspaces: WorkspaceInfo[] = [];
+    if (currentWorkspaceInfo) {
+      // 只使用当前工作区
+      allWorkspaces = [currentWorkspaceInfo];
+      logInfo(`Indexing documents in current workspace: ${currentWorkspaceInfo.name}`);
+    } else {
+      // 如果没有设置当前工作区，则获取所有工作区（保持原有行为）
+      allWorkspaces = await findAllWorkspaces(this.app);
+      logInfo(`Indexing documents in all ${allWorkspaces.length} workspaces (no current workspace set)`);
+    }
+    // logInfo(`Found ${allWorkspaces.length} workspaces for indexing`);
 
     // 辅助函数：确定文件属于哪个工作区
     const getWorkspaceForFile = (filePath: string): WorkspaceInfo | null => {
@@ -545,7 +559,30 @@ export class IndexOperations {
 
   private async getFilesToIndex(overwrite?: boolean): Promise<TFile[]> {
     const { inclusions, exclusions } = getMatchingPatterns();
-    const allMarkdownFiles = this.app.vault.getMarkdownFiles();
+    // const allMarkdownFiles = this.app.vault.getMarkdownFiles();
+
+    // 获取当前工作区信息
+    const currentWorkspaceInfo = workspaceManager.getCurrentWorkspaceInfo();
+    
+    let allMarkdownFiles: TFile[];
+    if (currentWorkspaceInfo) {
+      // 如果设置了当前工作区，只获取该工作区下的文件
+      const workspacePath = currentWorkspaceInfo.relativePath;
+      allMarkdownFiles = this.app.vault.getMarkdownFiles().filter(file => {
+        // 根工作区特殊处理
+        if (workspacePath === "/") {
+          // 不包含 "/" 的文件路径表示在根目录下
+          return !file.path.includes("/");
+        }
+        // 非根工作区，检查文件是否在该工作区路径下
+        return file.path.startsWith(workspacePath + "/");
+      });
+      logInfo(`Found ${allMarkdownFiles.length} markdown files in current workspace: ${currentWorkspaceInfo.relativePath}`);
+    } else {
+      // 如果没有设置当前工作区，获取所有markdown文件（保持原有行为）
+      allMarkdownFiles = this.app.vault.getMarkdownFiles();
+      logInfo(`Found ${allMarkdownFiles.length} markdown files in vault (no current workspace set)`);
+    }
 
     // If overwrite is true, return all markdown files that match current filters
     if (overwrite) {
