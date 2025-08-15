@@ -112,6 +112,18 @@ export class IndexOperations {
       // Clear the missing embeddings list before starting new indexing
       this.dbOps.clearFilesMissingEmbeddings();
 
+      // 为了避免旧索引残留：在写入新的chunk之前，先删除这些文件的所有旧文档
+      try {
+        const uniquePathsToReindex = Array.from(
+          new Set(allChunks.map((chunk) => chunk.fileInfo.path))
+        );
+        for (const path of uniquePathsToReindex) {
+          await this.dbOps.removeDocs(path);
+        }
+      } catch (err) {
+        this.handleError(err, { errors });
+      }
+
       // Process chunks in batches
       for (let i = 0; i < allChunks.length; i += this.embeddingBatchSize) {
         if (this.state.isIndexingCancelled) break;
@@ -146,7 +158,7 @@ export class IndexOperations {
             try {
               await this.dbOps.upsert({
                 ...chunk.fileInfo,
-                id: this.getDocHash(chunk.content),
+                id: this.getDocHash(chunk.content, chunk.fileInfo.path, chunk.subtitle),
                 content: chunk.content,
                 embedding,
                 created_at: Date.now(),
@@ -439,8 +451,9 @@ export class IndexOperations {
     return allChunks;
   }
 
-  private getDocHash(sourceDocument: string): string {
-    return MD5(sourceDocument).toString();
+  private getDocHash(sourceDocument: string, path: string, subtitle?: string): string {
+    const sub = subtitle || "/";
+    return MD5(`${path}|${sub}|${sourceDocument}`).toString();
   }
 
   /**
@@ -831,7 +844,7 @@ export class IndexOperations {
         const chunk = chunks[i];
         await this.dbOps.upsert({
           ...chunk.fileInfo,
-          id: this.getDocHash(chunk.content),
+          id: this.getDocHash(chunk.content, chunk.fileInfo.path, chunk.subtitle),
           content: chunk.content,
           embedding: embeddings[i],
           created_at: Date.now(),

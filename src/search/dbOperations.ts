@@ -185,6 +185,9 @@ export class DBOperations {
       const searchResult = await search(this.oramaDb, {
         term: filePath,
         properties: ["path"],
+        exact: true,
+        limit: 100000,
+        includeVectors: true,
       });
       if (searchResult.hits.length > 0) {
         await removeMultiple(
@@ -378,15 +381,24 @@ export class DBOperations {
           getSettings().numPartitions
         );
 
-        // Check if document exists
+        // Check if document with the same content-hash id exists (exact match) and remove all duplicates
         const existingDoc = await search(db, {
           term: docToSave.id,
           properties: ["id"],
-          limit: 1,
+          exact: true,
+          limit: 1000,
         });
 
         if (existingDoc.hits.length > 0) {
-          await remove(db, existingDoc.hits[0].id);
+          if (existingDoc.hits.length === 1) {
+            await remove(db, existingDoc.hits[0].id);
+          } else {
+            await removeMultiple(
+              db,
+              existingDoc.hits.map((h) => h.id),
+              500
+            );
+          }
         }
 
         // Insert into the assigned partition
