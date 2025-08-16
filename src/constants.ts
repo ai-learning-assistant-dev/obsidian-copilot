@@ -728,7 +728,7 @@ export const DEFAULT_SETTINGS: CopilotSettings = {
   includeActiveNoteAsContext: true,
   defaultOpenArea: DEFAULT_OPEN_AREA.VIEW,
   customPromptsFolder: DEFAULT_CUSTOM_PROMPTS_FOLDER,
-  indexVaultToVectorStore: VAULT_VECTOR_STORE_STRATEGY.ON_MODE_SWITCH,
+  indexVaultToVectorStore: VAULT_VECTOR_STORE_STRATEGY.ON_WORKSPACE_SWITCH,
   qaExclusions: `${DEFAULT_CHAT_HISTORY_FOLDER},${DEFAULT_CUSTOM_PROMPTS_FOLDER}`,
   qaInclusions: "",
   chatNoteContextPath: "",
