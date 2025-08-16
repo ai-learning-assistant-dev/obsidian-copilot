@@ -168,14 +168,28 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
               return part.replace(regex, (match: string, selection: string) => {
                 // For links with headings (e.g., "filename#heading"), extract just the filename for file lookup
                 const fileName = selection.includes("#") ? selection.split("#")[0] : selection;
-                const file = app.metadataCache.getFirstLinkpathDest(fileName, sourcePath);
+
+                // Try multiple approaches to find the file
+                let file = app.metadataCache.getFirstLinkpathDest(fileName, sourcePath);
+
+                // If file not found, try to find by exact match in vault
+                if (!file) {
+                  const allFiles = app.vault.getMarkdownFiles();
+                  file =
+                    allFiles.find((f) => f.basename === fileName) ||
+                    allFiles.find((f) => f.name === fileName + ".md") ||
+                    allFiles.find((f) => f.path === fileName) ||
+                    allFiles.find((f) => f.name === fileName) ||
+                    null;
+                }
 
                 if (file) {
                   // If the original selection contains a heading, create a link that opens to the heading
                   if (selection.includes("#")) {
                     const heading = selection.split("#").slice(1).join("#"); // Handle multiple # in heading
                     const linkText = `${file.basename}#${heading}`;
-                    const linkData = `${file.basename}#${heading}`;
+                    // Use the original selection for data-link to preserve exact file reference
+                    const linkData = selection;
 
                     return `<a href="#" data-link="${linkData}" class="copilot-heading-link" style="text-decoration: underline; color: var(--link-color);">${linkText}</a>`;
                   } else {
@@ -216,9 +230,10 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
       const sourcesSectionProcessed = processSourcesSection(thinkSectionProcessed);
 
       // Transform [[link]] to clickable format but exclude ![[]] image links
+      // Use non-greedy match until "]]" to support file names containing "]"
       const noteLinksProcessed = replaceLinks(
         sourcesSectionProcessed,
-        /(?<!!)\[\[([^\]]+)]]/g,
+        /(?<!!)\[\[([\s\S]*?)\]\]/g,
         (file: TFile) =>
           `<a href="obsidian://open?file=${encodeURIComponent(file.path)}">${file.basename}</a>`
       );
