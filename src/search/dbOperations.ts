@@ -182,17 +182,32 @@ export class DBOperations {
       throw new CustomError("Orama database not found.");
     }
     try {
-      const searchResult = await search(this.oramaDb, {
-        term: filePath,
-        properties: ["path"],
-        exact: true,
-        limit: 100000,
-        includeVectors: true,
-      });
-      if (searchResult.hits.length > 0) {
+      if (!filePath || filePath.trim().length === 0) {
+        if (getSettings().debug) {
+          logError("removeDocs called with empty filePath");
+        }
+        return;
+      }
+
+      const hits = await DBOperations.getDocsByPath(this.oramaDb, filePath);
+      if (hits && hits.length > 0) {
+        if (getSettings().debug) {
+          const preview = hits
+            .slice(0, 10)
+            .map((h) => ({
+              id: h.id,
+              path: (h as any).document?.path,
+              title: (h as any).document?.title,
+              subtitle: (h as any).document?.subtitle,
+            }));
+          logInfo(
+            `Deleting ${hits.length} document chunk(s) from local Copilot index for path: ${filePath}`,
+            preview
+          );
+        }
         await removeMultiple(
           this.oramaDb,
-          searchResult.hits.map((hit) => hit.id),
+          hits.map((hit) => hit.id),
           500
         );
         if (getSettings().debug) {
@@ -301,9 +316,12 @@ export class DBOperations {
       term: path,
       properties: ["path"],
       exact: true,
+      limit: 100000,
       includeVectors: true,
     });
-    return result.hits;
+    // 强制按文档路径做严格等值过滤，避免分词/标点导致的误命中
+    const filtered = result.hits.filter((hit: any) => hit?.document?.path === path);
+    return filtered;
   }
 
   public static async getDocsByEmbedding(
