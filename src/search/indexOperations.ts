@@ -85,11 +85,14 @@ export class IndexOperations {
       // Clear index and tracking if overwrite is true
       if (overwrite) {
         await this.dbOps.clearIndex(embeddingInstance);
-        this.dbOps.clearFilesMissingEmbeddings();
+        // this.dbOps.clearFilesMissingEmbeddings();
       } else {
         // Run garbage collection first to clean up stale documents
         await this.dbOps.garbageCollect();
       }
+
+      // Clear the missing embeddings list before starting new indexing
+      this.dbOps.clearFilesMissingEmbeddings();
 
       const files = await this.getFilesToIndex(overwrite);
       if (files.length === 0) {
@@ -109,9 +112,6 @@ export class IndexOperations {
       const actualFilesToProcess = new Set(allChunks.map((chunk) => chunk.fileInfo.path)).size;
       this.initializeIndexingState(actualFilesToProcess);
       this.createIndexingNotice();
-
-      // Clear the missing embeddings list before starting new indexing
-      this.dbOps.clearFilesMissingEmbeddings();
 
       // Process chunks in batches
       for (let i = 0; i < allChunks.length; i += this.embeddingBatchSize) {
@@ -239,9 +239,9 @@ export class IndexOperations {
 
     // 获取所有工作区信息
     // const allWorkspaces: WorkspaceInfo[] = await findAllWorkspaces(this.app);
-    
-    const currentWorkspaceInfo = workspaceManager.getCurrentWorkspaceInfo(); 
-    
+
+    const currentWorkspaceInfo = workspaceManager.getCurrentWorkspaceInfo();
+
     let allWorkspaces: WorkspaceInfo[] = [];
     if (currentWorkspaceInfo) {
       // 只使用当前工作区
@@ -250,7 +250,9 @@ export class IndexOperations {
     } else {
       // 如果没有设置当前工作区，则获取所有工作区（保持原有行为）
       allWorkspaces = await findAllWorkspaces(this.app);
-      logInfo(`Indexing documents in all ${allWorkspaces.length} workspaces (no current workspace set)`);
+      logInfo(
+        `Indexing documents in all ${allWorkspaces.length} workspaces (no current workspace set)`
+      );
     }
     // logInfo(`Found ${allWorkspaces.length} workspaces for indexing`);
 
@@ -563,12 +565,12 @@ export class IndexOperations {
 
     // 获取当前工作区信息
     const currentWorkspaceInfo = workspaceManager.getCurrentWorkspaceInfo();
-    
+
     let allMarkdownFiles: TFile[];
     if (currentWorkspaceInfo) {
       // 如果设置了当前工作区，只获取该工作区下的文件
       const workspacePath = currentWorkspaceInfo.relativePath;
-      allMarkdownFiles = this.app.vault.getMarkdownFiles().filter(file => {
+      allMarkdownFiles = this.app.vault.getMarkdownFiles().filter((file) => {
         // 根工作区特殊处理
         if (workspacePath === "/") {
           // 不包含 "/" 的文件路径表示在根目录下
@@ -577,11 +579,27 @@ export class IndexOperations {
         // 非根工作区，检查文件是否在该工作区路径下
         return file.path.startsWith(workspacePath + "/");
       });
-      logInfo(`Found ${allMarkdownFiles.length} markdown files in current workspace: ${currentWorkspaceInfo.relativePath}`);
+      logInfo(
+        `Found ${allMarkdownFiles.length} markdown files in current workspace: ${currentWorkspaceInfo.relativePath}`
+      );
     } else {
       // 如果没有设置当前工作区，获取所有markdown文件（保持原有行为）
       allMarkdownFiles = this.app.vault.getMarkdownFiles();
-      logInfo(`Found ${allMarkdownFiles.length} markdown files in vault (no current workspace set)`);
+      logInfo(
+        `Found ${allMarkdownFiles.length} markdown files in vault (no current workspace set)`
+      );
+    }
+
+    // 如果设置了当前工作区，过滤掉该工作区下的 data.md 文件
+    if (currentWorkspaceInfo) {
+      allMarkdownFiles = allMarkdownFiles.filter((file) => {
+        // 检查是否为 data.md 配置文件
+        if (file.name === "data.md") {
+          logInfo(`Skipping configuration file ${file.path} - not indexing data.md files`);
+          return false;
+        }
+        return true;
+      });
     }
 
     // If overwrite is true, return all markdown files that match current filters
@@ -616,6 +634,13 @@ export class IndexOperations {
       const needsEmbeddings = filesMissingEmbeddings.has(file.path);
 
       if (!isIndexed || needsEmbeddings || file.stat.mtime > latestMtime) {
+        // console.log('file.path:', file.path);
+        // console.log('indexFilePahts:', indexedFilePaths);
+        // console.log('isIndexed:', isIndexed);
+        // console.log('needsEmbeddings:', needsEmbeddings);
+        // console.log('filesMissingEmbeddings:', filesMissingEmbeddings);
+        // console.log(`fileMtime: ${file.stat.mtime}, latestMtime: ${latestMtime}`);
+
         filesToIndex.add(file);
       }
     }

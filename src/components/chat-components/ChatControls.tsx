@@ -38,6 +38,8 @@ import {
   convertToPersonaConfig,
 } from "@/utils/workspaceUtils";
 import { workspaceManager } from "@/utils/workspaceUtils";
+import { VAULT_VECTOR_STORE_STRATEGY } from "@/constants";
+import { getSettings } from "@/settings/model";
 export async function refreshVaultIndex() {
   try {
     await VectorStoreManager.getInstance().indexVaultToVectorStore();
@@ -182,60 +184,63 @@ export function ChatControls({
     return [...presets, ...workspacePersonas];
   }, [settings.systemPrompts?.presets, workspacePersonas]);
 
-// 替换现有的两个 useEffect 钩子为一个统一的处理逻辑
-React.useEffect(() => {
-  const loadWorkspaceData = async () => {
-    if (selectedChain === ChainType.VAULT_QA_CHAIN) {
-      try {
-        // 1. 加载工作区列表
-        const workspaces = await findAllWorkspaces(app, {
-          configFileName: "data.md",
-          recursive: true,
-          maxDepth: 5,
-        });
-        setWorkspaces(workspaces);
+  // 替换现有的两个 useEffect 钩子为一个统一的处理逻辑
+  React.useEffect(() => {
+    const loadWorkspaceData = async () => {
+      if (selectedChain === ChainType.VAULT_QA_CHAIN) {
+        try {
+          // 1. 加载工作区列表
+          const workspaces = await findAllWorkspaces(app, {
+            configFileName: "data.md",
+            recursive: true,
+            maxDepth: 5,
+          });
+          setWorkspaces(workspaces);
 
-        // 2. 处理当前工作区状态
-        const currentWorkspace = workspaceManager.getCurrentWorkspaceInfo();
-        let selectedWorkspaceInfo: WorkspaceInfo | null = null;
+          // 2. 处理当前工作区状态
+          const currentWorkspace = workspaceManager.getCurrentWorkspaceInfo();
+          let selectedWorkspaceInfo: WorkspaceInfo | null = null;
 
-        // 如果已经有设置的工作区且在当前工作区列表中，则使用该工作区
-        if (currentWorkspace && workspaces.some(w => w.relativePath === currentWorkspace.relativePath)) {
-          selectedWorkspaceInfo = currentWorkspace;
-        } else if (workspaces.length > 0) {
-          // 否则默认选择第一个工作区
-          selectedWorkspaceInfo = workspaces[0];
-          // 同步到 workspaceManager
-          workspaceManager.setCurrentWorkspace(selectedWorkspaceInfo);
-        }
+          // 如果已经有设置的工作区且在当前工作区列表中，则使用该工作区
+          if (
+            currentWorkspace &&
+            workspaces.some((w) => w.relativePath === currentWorkspace.relativePath)
+          ) {
+            selectedWorkspaceInfo = currentWorkspace;
+          } else if (workspaces.length > 0) {
+            // 否则默认选择第一个工作区
+            selectedWorkspaceInfo = workspaces[0];
+            // 同步到 workspaceManager
+            workspaceManager.setCurrentWorkspace(selectedWorkspaceInfo);
+          }
 
-        // 更新本地状态
-        if (selectedWorkspaceInfo) {
-          setSelectedWorkspace(selectedWorkspaceInfo.relativePath);
-          
-          // 3. 加载选中工作区的人设配置
-          try {
-            const config = await getWorkspaceConfig(app, selectedWorkspaceInfo.relativePath);
-            setWorkspacePersonas(config.personas || []);
-          } catch (error) {
-            console.error("Failed to load workspace config:", error);
+          // 更新本地状态
+          if (selectedWorkspaceInfo) {
+            setSelectedWorkspace(selectedWorkspaceInfo.relativePath);
+
+            // 3. 加载选中工作区的人设配置
+            try {
+              const config = await getWorkspaceConfig(app, selectedWorkspaceInfo.relativePath);
+              setWorkspacePersonas(config.personas || []);
+            } catch (error) {
+              console.error("Failed to load workspace config:", error);
+              setWorkspacePersonas([]);
+            }
+          } else {
+            setSelectedWorkspace("无工作区");
             setWorkspacePersonas([]);
           }
-        } else {
+        } catch (error) {
+          console.error("Failed to load workspace data:", error);
+          setWorkspaces([]);
           setSelectedWorkspace("无工作区");
           setWorkspacePersonas([]);
         }
-      } catch (error) {
-        console.error("Failed to load workspace data:", error);
-        setWorkspaces([]);
-        setSelectedWorkspace("无工作区");
-        setWorkspacePersonas([]);
       }
-    } 
-  };
+    };
 
-  loadWorkspaceData();
-}, [selectedChain]);
+    loadWorkspaceData();
+  }, [selectedChain]);
 
   // 初始化或恢复人设选择
   // 更新系统提示词的公共方法
@@ -265,6 +270,7 @@ React.useEffect(() => {
   }, [allPersonas, selectedPersona, updateSystemPrompt]);
   // 切换工作区时仅加载配置，不自动选择人设
   const handleWorkspaceChange = async (workspace: WorkspaceInfo) => {
+    const previousWorkspace = workspaceManager.getCurrentWorkspaceInfo();
     workspaceManager.setCurrentWorkspace(workspace);
     setSelectedWorkspace(workspace.relativePath);
     try {
@@ -273,6 +279,18 @@ React.useEffect(() => {
     } catch (error) {
       console.error("Failed to load workspace config:", error);
       setWorkspacePersonas([]); // 失败时清空人设列表
+    }
+
+    // 检查是否需要根据策略重建索引
+    const settings = getSettings();
+    if (
+      settings.indexVaultToVectorStore === VAULT_VECTOR_STORE_STRATEGY.ON_WORKSPACE_SWITCH &&
+      selectedChain === ChainType.VAULT_QA_CHAIN
+    ) {
+      // 只有在实际切换了工作区时才重建索引
+      if (!previousWorkspace || previousWorkspace.relativePath !== workspace.relativePath) {
+        await refreshVaultIndex();
+      }
     }
   };
   const handleModeChange = async (chainType: ChainType) => {
@@ -414,9 +432,7 @@ React.useEffect(() => {
                 workspaces.map((workspace) => (
                   <DropdownMenuItem
                     key={workspace.relativePath}
-                    onSelect={() =>
-                      handleWorkspaceChange(workspace)
-                    }
+                    onSelect={() => handleWorkspaceChange(workspace)}
                     className="tw-flex tw-justify-between" // 新增flex布局
                   >
                     <span>{workspace.relativePath}</span>
