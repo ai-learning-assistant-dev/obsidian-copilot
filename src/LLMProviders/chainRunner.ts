@@ -102,7 +102,7 @@ class ThinkBlockStreamer {
   // 添加发送文本到TTS插件的方法
   private async sendTextToTTS(text: string) {
     if (!text) return;
-    
+
     try {
       // 获取设置判断是否启用自动语音播放
       const settings = getSettings();
@@ -113,11 +113,11 @@ class ThinkBlockStreamer {
       // 获取aloud插件实例
       const ttsPlugin = (window as any).app?.plugins?.getPlugin("aloud-tts-ai-learning-assistant");
       if (ttsPlugin?.ttsService?.playStreamText) {
-         // 直接发送文本，不分块
+        // 直接发送文本，不分块
         await ttsPlugin.ttsService.playStreamText({
           index: this.ttsIndex++,
           length: text.length,
-          text: text
+          text: text,
         });
       }
     } catch (error) {
@@ -140,7 +140,7 @@ class ThinkBlockStreamer {
         await ttsPlugin.ttsService.playStreamText({
           index: this.ttsIndex++,
           length: 0,
-          text: ""
+          text: "",
         });
       }
     } catch (error) {
@@ -358,20 +358,20 @@ class LLMChainRunner extends BaseChainRunner {
 
       logInfo("==== Final Request to AI ====\n", messages);
 
-      // Stream with abort signal
-      const chatStream = await withSuppressedTokenWarnings(() =>
-        this.chainManager.chatModelManager.getChatModel().stream(messages, {
-          signal: abortController.signal,
-        })
-      );
+      // Stream with abort signal, suppress warnings for the entire streaming lifecycle
+      await withSuppressedTokenWarnings(async () => {
+        const chatStream = await this.chainManager.chatModelManager
+          .getChatModel()
+          .stream(messages, { signal: abortController.signal });
 
-      for await (const chunk of chatStream) {
-        if (abortController.signal.aborted) {
-          logInfo("Stream iteration aborted", { reason: abortController.signal.reason });
-          break;
+        for await (const chunk of chatStream) {
+          if (abortController.signal.aborted) {
+            logInfo("Stream iteration aborted", { reason: abortController.signal.reason });
+            break;
+          }
+          streamer.processChunk(chunk);
         }
-        streamer.processChunk(chunk);
-      }
+      });
     } catch (error: any) {
       // Check if the error is due to abort signal
       if (error.name === "AbortError" || abortController.signal.aborted) {
@@ -489,21 +489,21 @@ class VaultQAChainRunner extends BaseChainRunner {
 
       logInfo("==== Final Request to AI ====\n", messages);
 
-      // Stream with abort signal
-      const chatStream = await withSuppressedTokenWarnings(() =>
-        this.chainManager.chatModelManager.getChatModel().stream(messages, {
-          signal: abortController.signal,
-        })
-      );
+      // Stream with abort signal, suppress warnings for the entire streaming lifecycle
+      await withSuppressedTokenWarnings(async () => {
+        const chatStream = await this.chainManager.chatModelManager
+          .getChatModel()
+          .stream(messages, { signal: abortController.signal });
 
-      for await (const chunk of chatStream) {
-        if (abortController.signal.aborted) {
-          logInfo("VaultQA stream iteration aborted", { reason: abortController.signal.reason });
-          break;
+        for await (const chunk of chatStream) {
+          if (abortController.signal.aborted) {
+            logInfo("VaultQA stream iteration aborted", { reason: abortController.signal.reason });
+            break;
+          }
+          // 修改为 await 调用
+          await streamer.processChunk(chunk);
         }
-        // 修改为 await 调用
-        await streamer.processChunk(chunk);
-      }
+      });
     } catch (error: any) {
       // Check if the error is due to abort signal
       if (error.name === "AbortError" || abortController.signal.aborted) {
@@ -523,8 +523,11 @@ class VaultQAChainRunner extends BaseChainRunner {
       return "";
     }
 
-    // Add sources to the response
-    fullAIResponse = this.addSourcestoResponse(fullAIResponse);
+    // Add sources to the response using only current-turn retrieved documents
+    fullAIResponse = this.addSourcestoResponse(
+      fullAIResponse,
+      this.chainManager.getRetrievedDocuments()
+    );
 
     return this.handleResponse(
       fullAIResponse,
@@ -535,13 +538,17 @@ class VaultQAChainRunner extends BaseChainRunner {
     );
   }
 
-  private addSourcestoResponse(response: string): string {
-    const docLinks = extractUniqueLinksFromDocs(this.chainManager.getRetrievedDocuments());
+  private addSourcestoResponse(response: string, docsForThisTurn: any[]): string {
+    // 移除响应中任何已有的 Sources 段，以避免重复
+    const sourcesSectionRegex = /(?:\r?\n){0,2}#### Sources:\r?\n\r?\n(?:- .*\r?\n)+/g;
+    let cleaned = response.replace(sourcesSectionRegex, "");
+
+    const docLinks = extractUniqueLinksFromDocs(docsForThisTurn);
     if (docLinks.length > 0) {
       const links = docLinks.map((link) => `- ${link}`).join("\n");
-      response += "\n\n#### Sources:\n\n" + links;
+      cleaned += "\n\n#### Sources:\n\n" + links;
     }
-    return response;
+    return cleaned;
   }
 }
 
@@ -718,22 +725,22 @@ class CopilotPlusChainRunner extends BaseChainRunner {
     logInfo("==== Final Request to AI ====\n", messages);
     const streamer = new ThinkBlockStreamer(updateCurrentAiMessage);
 
-    // Wrap the stream call with warning suppression
-    const chatStream = await withSuppressedTokenWarnings(() =>
-      this.chainManager.chatModelManager.getChatModel().stream(messages, {
-        signal: abortController.signal,
-      })
-    );
+    // Wrap the entire streaming lifecycle with warning suppression
+    await withSuppressedTokenWarnings(async () => {
+      const chatStream = await this.chainManager.chatModelManager
+        .getChatModel()
+        .stream(messages, { signal: abortController.signal });
 
-    for await (const chunk of chatStream) {
-      if (abortController.signal.aborted) {
-        logInfo("CopilotPlus multimodal stream iteration aborted", {
-          reason: abortController.signal.reason,
-        });
-        break;
+      for await (const chunk of chatStream) {
+        if (abortController.signal.aborted) {
+          logInfo("CopilotPlus multimodal stream iteration aborted", {
+            reason: abortController.signal.reason,
+          });
+          break;
+        }
+        streamer.processChunk(chunk);
       }
-      streamer.processChunk(chunk);
-    }
+    });
 
     return streamer.close();
   }

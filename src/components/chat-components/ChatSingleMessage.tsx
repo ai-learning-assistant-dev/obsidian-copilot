@@ -244,10 +244,17 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
   );
 
   const processSourcesSection = (content: string): string => {
-    const sections = content.split("\n\n#### Sources:\n\n");
+    // 仅在消息末尾存在 Sources 标题时解析，避免误把历史 Sources 拼接到新消息
+    const marker = "\n\n#### Sources:\n\n";
+    const lastIndex = content.lastIndexOf(marker);
+    if (lastIndex === -1) return content;
+    // 丢弃所有早于最后一次 Sources 的段落，避免历史重复
+    const mainContent = content.slice(0, lastIndex);
+    const sourcesTail = content.slice(lastIndex + marker.length);
+    const sections = [mainContent, sourcesTail];
     if (sections.length !== 2) return content;
 
-    const [mainContent, sources] = sections;
+    const [mc, sources] = sections;
     const sourceLinks = sources
       .split("\n")
       .map((line) => {
@@ -260,7 +267,7 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
       .join("\n");
 
     return (
-      mainContent +
+      mc +
       "\n\n<br/>\n<details><summary>Sources</summary>\n<ul>\n" +
       sourceLinks +
       "\n</ul>\n</details>"
