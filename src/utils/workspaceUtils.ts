@@ -240,13 +240,13 @@ export async function getWorkspaceInfo(
 }
 
 export interface WorkspaceState {
-  currentWorkspacePath: string | null;
+  currentWorkspace: WorkspaceInfo  | null;
 }
 
 class WorkspaceManager {
   private static instance: WorkspaceManager;
   private state: WorkspaceState = {
-    currentWorkspacePath: null,
+    currentWorkspace: null,
   };
 
   private constructor() {}
@@ -258,15 +258,19 @@ class WorkspaceManager {
     return WorkspaceManager.instance;
   }
 
-  public setCurrentWorkspace(path: string | null): void {
+  public setCurrentWorkspace(workspace: WorkspaceInfo  | null): void {
     if (getSettings().debug) {
-      console.log("切换工作区:", this.state.currentWorkspacePath, "->", path);
+      console.log("切换工作区:", this.state.currentWorkspace, "->", workspace);
     }
-    this.state.currentWorkspacePath = path;
+    this.state.currentWorkspace  = workspace;
   }
 
   public getCurrentWorkspace(): WorkspaceState {
     return this.state;
+  }
+
+  public getCurrentWorkspaceInfo(): WorkspaceInfo | null {
+    return this.state.currentWorkspace;
   }
 }
 

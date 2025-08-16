@@ -71,6 +71,14 @@ export const QASettings: React.FC = () => {
                                 <span>Updates when entering QA mode (Recommended)</span>
                               </div>
                             </li>
+                            <li>
+                              <div className="tw-flex tw-items-center tw-gap-1">
+                                <strong className="tw-inline-block tw-whitespace-nowrap">
+                                  ON WORKSPACE SWITCH:
+                                </strong>
+                                <span>Updates when switching workspace in QA mode</span>
+                              </div>
+                            </li>
                           </ul>
                         </div>
                         <p className="tw-text-sm tw-text-callout-warning">

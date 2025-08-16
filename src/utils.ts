@@ -979,11 +979,19 @@ export async function withSuppressedTokenWarnings<T>(fn: () => Promise<T>): Prom
   try {
     // Replace with filtered version
     console.warn = function (...args) {
-      // Ignore token counting warnings
+      // Normalize message text
+      const msg = typeof args[0] === "string" ? args[0] : String(args[0] ?? "");
+
+      // Ignore known noisy warnings
       if (
-        args[0]?.includes &&
-        (args[0].includes("Failed to calculate number of tokens") ||
-          args[0].includes("Unknown model"))
+        // Token count related
+        msg.includes("Failed to calculate number of tokens") ||
+        msg.includes("Unknown model") ||
+        // LangChain/OpenAI chunk merging noise (usage fields repeated/unsupported type)
+        /field\[[^\]]+\] already exists in this message chunk/i.test(msg) ||
+        /value has unsupported type/i.test(msg) ||
+        msg.includes("completion_tokens") ||
+        msg.includes("total_tokens")
       ) {
         return;
       }
