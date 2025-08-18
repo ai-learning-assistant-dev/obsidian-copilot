@@ -257,12 +257,16 @@ export class HybridRetriever extends BaseRetriever {
     const db = await VectorStoreManager.getInstance().getDb();
 
     // Check if we need workspace filtering
-    const currentWorkspace = workspaceManager.getCurrentWorkspace();
-    const shouldFilterByWorkspace = currentWorkspace.currentWorkspacePath;
+    // const currentWorkspace = workspaceManager.getCurrentWorkspace();
+    // const shouldFilterByWorkspace = currentWorkspace.currentWorkspacePath;
 
+    const currentWorkspaceInfo = workspaceManager.getCurrentWorkspaceInfo();
+    const shouldFilterByWorkspace = currentWorkspaceInfo !== null;
+
+    
     // Debug: 显示workspace过滤信息
     if (getSettings().debug) {
-      console.log("Workspace过滤:", currentWorkspace.currentWorkspacePath || "无");
+      console.log("Workspace过滤:", currentWorkspaceInfo?.name || "无");
     }
 
     const searchParams: any = {
@@ -324,14 +328,14 @@ export class HybridRetriever extends BaseRetriever {
     if (getSettings().debug) {
       if (shouldFilterByWorkspace) {
         console.log("==== Workspace Filter (Manual) ====");
-        console.log("Current workspace name:", currentWorkspace.currentWorkspacePath);
+        console.log("Current workspace name:", currentWorkspaceInfo?.relativePath);
         console.log(
           "Retrieving all documents, will filter by workspace then slice to",
           this.options.maxK
         );
       } else {
         console.log("==== No Workspace Filter ====");
-        console.log("Current workspace state:", currentWorkspace);
+        console.log("Current workspace state:", currentWorkspaceInfo);
       }
     }
 
@@ -416,7 +420,7 @@ export class HybridRetriever extends BaseRetriever {
     // Apply manual workspace filtering
     if (shouldFilterByWorkspace) {
       const workspaceMatches = searchResults.hits.filter((hit) => {
-        return hit.document.workspace_path === currentWorkspace.currentWorkspacePath;
+        return hit.document.workspace_path === currentWorkspaceInfo?.relativePath;
       });
 
       // Limit to the requested maxK results

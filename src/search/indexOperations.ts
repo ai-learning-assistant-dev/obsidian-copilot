@@ -20,6 +20,7 @@ import {
   getMatchingPatterns,
   shouldIndexFile,
 } from "./searchUtils";
+import { workspaceManager } from "@/utils/workspaceUtils";
 
 export interface IndexingState {
   isIndexingPaused: boolean;
@@ -84,11 +85,14 @@ export class IndexOperations {
       // Clear index and tracking if overwrite is true
       if (overwrite) {
         await this.dbOps.clearIndex(embeddingInstance);
-        this.dbOps.clearFilesMissingEmbeddings();
+        // this.dbOps.clearFilesMissingEmbeddings();
       } else {
         // Run garbage collection first to clean up stale documents
         await this.dbOps.garbageCollect();
       }
+
+      // Clear the missing embeddings list before starting new indexing
+      this.dbOps.clearFilesMissingEmbeddings();
 
       const files = await this.getFilesToIndex(overwrite);
       if (files.length === 0) {
@@ -109,8 +113,20 @@ export class IndexOperations {
       this.initializeIndexingState(actualFilesToProcess);
       this.createIndexingNotice();
 
-      // Clear the missing embeddings list before starting new indexing
-      this.dbOps.clearFilesMissingEmbeddings();
+      // // Clear the missing embeddings list before starting new indexing
+      // this.dbOps.clearFilesMissingEmbeddings();
+
+      // 为了避免旧索引残留：在写入新的chunk之前，先删除这些文件的所有旧文档
+      try {
+        const uniquePathsToReindex = Array.from(
+          new Set(allChunks.map((chunk) => chunk.fileInfo.path))
+        );
+        for (const path of uniquePathsToReindex) {
+          await this.dbOps.removeDocs(path);
+        }
+      } catch (err) {
+        this.handleError(err, { errors });
+      }
 
       // Process chunks in batches
       for (let i = 0; i < allChunks.length; i += this.embeddingBatchSize) {
@@ -146,7 +162,7 @@ export class IndexOperations {
             try {
               await this.dbOps.upsert({
                 ...chunk.fileInfo,
-                id: this.getDocHash(chunk.content),
+                id: this.getDocHash(chunk.content, chunk.fileInfo.path, chunk.subtitle),
                 content: chunk.content,
                 embedding,
                 created_at: Date.now(),
@@ -237,8 +253,23 @@ export class IndexOperations {
     const embeddingModel = EmbeddingsManager.getModelName(embeddingInstance);
 
     // 获取所有工作区信息
-    const allWorkspaces: WorkspaceInfo[] = await findAllWorkspaces(this.app);
-    logInfo(`Found ${allWorkspaces.length} workspaces for indexing`);
+    // const allWorkspaces: WorkspaceInfo[] = await findAllWorkspaces(this.app);
+
+    const currentWorkspaceInfo = workspaceManager.getCurrentWorkspaceInfo();
+
+    let allWorkspaces: WorkspaceInfo[] = [];
+    if (currentWorkspaceInfo) {
+      // 只使用当前工作区
+      allWorkspaces = [currentWorkspaceInfo];
+      logInfo(`Indexing documents in current workspace: ${currentWorkspaceInfo.name}`);
+    } else {
+      // 如果没有设置当前工作区，则获取所有工作区（保持原有行为）
+      allWorkspaces = await findAllWorkspaces(this.app);
+      logInfo(
+        `Indexing documents in all ${allWorkspaces.length} workspaces (no current workspace set)`
+      );
+    }
+    // logInfo(`Found ${allWorkspaces.length} workspaces for indexing`);
 
     // 辅助函数：确定文件属于哪个工作区
     const getWorkspaceForFile = (filePath: string): WorkspaceInfo | null => {
@@ -439,8 +470,9 @@ export class IndexOperations {
     return allChunks;
   }
 
-  private getDocHash(sourceDocument: string): string {
-    return MD5(sourceDocument).toString();
+  private getDocHash(sourceDocument: string, path: string, subtitle?: string): string {
+    const sub = subtitle || "/";
+    return MD5(`${path}|${sub}|${sourceDocument}`).toString();
   }
 
   /**
@@ -545,7 +577,46 @@ export class IndexOperations {
 
   private async getFilesToIndex(overwrite?: boolean): Promise<TFile[]> {
     const { inclusions, exclusions } = getMatchingPatterns();
-    const allMarkdownFiles = this.app.vault.getMarkdownFiles();
+    // const allMarkdownFiles = this.app.vault.getMarkdownFiles();
+
+    // 获取当前工作区信息
+    const currentWorkspaceInfo = workspaceManager.getCurrentWorkspaceInfo();
+
+    let allMarkdownFiles: TFile[];
+    if (currentWorkspaceInfo) {
+      // 如果设置了当前工作区，只获取该工作区下的文件
+      const workspacePath = currentWorkspaceInfo.relativePath;
+      allMarkdownFiles = this.app.vault.getMarkdownFiles().filter((file) => {
+        // 根工作区特殊处理
+        if (workspacePath === "/") {
+          // 不包含 "/" 的文件路径表示在根目录下
+          return !file.path.includes("/");
+        }
+        // 非根工作区，检查文件是否在该工作区路径下
+        return file.path.startsWith(workspacePath + "/");
+      });
+      logInfo(
+        `Found ${allMarkdownFiles.length} markdown files in current workspace: ${currentWorkspaceInfo.relativePath}`
+      );
+    } else {
+      // 如果没有设置当前工作区，获取所有markdown文件（保持原有行为）
+      allMarkdownFiles = this.app.vault.getMarkdownFiles();
+      logInfo(
+        `Found ${allMarkdownFiles.length} markdown files in vault (no current workspace set)`
+      );
+    }
+
+    // 如果设置了当前工作区，过滤掉该工作区下的 data.md 文件
+    if (currentWorkspaceInfo) {
+      allMarkdownFiles = allMarkdownFiles.filter((file) => {
+        // 检查是否为 data.md 配置文件
+        if (file.name === "data.md") {
+          logInfo(`Skipping configuration file ${file.path} - not indexing data.md files`);
+          return false;
+        }
+        return true;
+      });
+    }
 
     // If overwrite is true, return all markdown files that match current filters
     if (overwrite) {
@@ -579,6 +650,13 @@ export class IndexOperations {
       const needsEmbeddings = filesMissingEmbeddings.has(file.path);
 
       if (!isIndexed || needsEmbeddings || file.stat.mtime > latestMtime) {
+        // console.log('file.path:', file.path);
+        // console.log('indexFilePahts:', indexedFilePaths);
+        // console.log('isIndexed:', isIndexed);
+        // console.log('needsEmbeddings:', needsEmbeddings);
+        // console.log('filesMissingEmbeddings:', filesMissingEmbeddings);
+        // console.log(`fileMtime: ${file.stat.mtime}, latestMtime: ${latestMtime}`);
+
         filesToIndex.add(file);
       }
     }
@@ -831,7 +909,7 @@ export class IndexOperations {
         const chunk = chunks[i];
         await this.dbOps.upsert({
           ...chunk.fileInfo,
-          id: this.getDocHash(chunk.content),
+          id: this.getDocHash(chunk.content, chunk.fileInfo.path, chunk.subtitle),
           content: chunk.content,
           embedding: embeddings[i],
           created_at: Date.now(),

@@ -168,14 +168,28 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
               return part.replace(regex, (match: string, selection: string) => {
                 // For links with headings (e.g., "filename#heading"), extract just the filename for file lookup
                 const fileName = selection.includes("#") ? selection.split("#")[0] : selection;
-                const file = app.metadataCache.getFirstLinkpathDest(fileName, sourcePath);
+
+                // Try multiple approaches to find the file
+                let file = app.metadataCache.getFirstLinkpathDest(fileName, sourcePath);
+
+                // If file not found, try to find by exact match in vault
+                if (!file) {
+                  const allFiles = app.vault.getMarkdownFiles();
+                  file =
+                    allFiles.find((f) => f.basename === fileName) ||
+                    allFiles.find((f) => f.name === fileName + ".md") ||
+                    allFiles.find((f) => f.path === fileName) ||
+                    allFiles.find((f) => f.name === fileName) ||
+                    null;
+                }
 
                 if (file) {
                   // If the original selection contains a heading, create a link that opens to the heading
                   if (selection.includes("#")) {
                     const heading = selection.split("#").slice(1).join("#"); // Handle multiple # in heading
                     const linkText = `${file.basename}#${heading}`;
-                    const linkData = `${file.basename}#${heading}`;
+                    // Use the original selection for data-link to preserve exact file reference
+                    const linkData = selection;
 
                     return `<a href="#" data-link="${linkData}" class="copilot-heading-link" style="text-decoration: underline; color: var(--link-color);">${linkText}</a>`;
                   } else {
@@ -216,9 +230,10 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
       const sourcesSectionProcessed = processSourcesSection(thinkSectionProcessed);
 
       // Transform [[link]] to clickable format but exclude ![[]] image links
+      // Use non-greedy match until "]]" to support file names containing "]"
       const noteLinksProcessed = replaceLinks(
         sourcesSectionProcessed,
-        /(?<!!)\[\[([^\]]+)]]/g,
+        /(?<!!)\[\[([\s\S]*?)\]\]/g,
         (file: TFile) =>
           `<a href="obsidian://open?file=${encodeURIComponent(file.path)}">${file.basename}</a>`
       );
@@ -229,10 +244,17 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
   );
 
   const processSourcesSection = (content: string): string => {
-    const sections = content.split("\n\n#### Sources:\n\n");
+    // 仅在消息末尾存在 Sources 标题时解析，避免误把历史 Sources 拼接到新消息
+    const marker = "\n\n#### Sources:\n\n";
+    const lastIndex = content.lastIndexOf(marker);
+    if (lastIndex === -1) return content;
+    // 丢弃所有早于最后一次 Sources 的段落，避免历史重复
+    const mainContent = content.slice(0, lastIndex);
+    const sourcesTail = content.slice(lastIndex + marker.length);
+    const sections = [mainContent, sourcesTail];
     if (sections.length !== 2) return content;
 
-    const [mainContent, sources] = sections;
+    const [mc, sources] = sections;
     const sourceLinks = sources
       .split("\n")
       .map((line) => {
@@ -245,7 +267,7 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
       .join("\n");
 
     return (
-      mainContent +
+      mc +
       "\n\n<br/>\n<details><summary>Sources</summary>\n<ul>\n" +
       sourceLinks +
       "\n</ul>\n</details>"
