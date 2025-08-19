@@ -156,36 +156,44 @@ export default class CopilotPlugin extends Plugin {
       if (this.asrSettings.Asr_debugMode) console.log("Transcribing " + file.path);
       const transcription = await this.transcriptionEngine.getTranscription(file);
 
-      let fileText = await this.app.vault.read(parent_file);
-      const fileLinkString = this.app.metadataCache.fileToLinktext(file, parent_file.path);
-      let fileLinkStringTagged = `${fileLinkString}]]`;
-      // Remove the leading 前3个字符 from the fileLinkStringTagged
-      fileLinkStringTagged = fileLinkStringTagged.slice(3);
-
-      const startReplacementIndex =
-        fileText.indexOf(fileLinkStringTagged) + fileLinkStringTagged.length;
-      if (this.asrSettings.Asr_lineSpacing === "single") {
-        fileText = [
-          fileText.slice(0, startReplacementIndex),
-          `${transcription}`,
-          fileText.slice(startReplacementIndex),
-        ].join(" ");
-      } else {
-        fileText = [
-          fileText.slice(0, startReplacementIndex),
-          `\n${transcription}`,
-          fileText.slice(startReplacementIndex),
-        ].join("");
-      }
-
-      //check if abortion signal is aborted
-
-      if (abortController?.signal?.aborted) {
-        new Notice(`Transcription of ${file.name} cancelled!`, 5 * 1000);
+      // 如果parent_file.path与file.path相同
+      if (parent_file.path === file.path) {
+        const newFilePath = parent_file.path + ".md";
+        await this.app.vault.create(newFilePath, transcription);
+        new Notice(`create ${newFilePath}`, 5 * 1000);
+        await this.app.workspace.openLinkText(newFilePath, "", true);
         return;
-      }
+      } else {
+        let fileText = await this.app.vault.read(parent_file);
+        const fileLinkString = this.app.metadataCache.fileToLinktext(file, parent_file.path);
+        let fileLinkStringTagged = `${fileLinkString}]]`;
+        // Remove the leading 前3个字符 from the fileLinkStringTagged
+        fileLinkStringTagged = fileLinkStringTagged.slice(3);
 
-      await this.app.vault.modify(parent_file, fileText);
+        const startReplacementIndex =
+          fileText.indexOf(fileLinkStringTagged) + fileLinkStringTagged.length;
+        if (this.asrSettings.Asr_lineSpacing === "single") {
+          fileText = [
+            fileText.slice(0, startReplacementIndex),
+            `${transcription}`,
+            fileText.slice(startReplacementIndex),
+          ].join(" ");
+        } else {
+          fileText = [
+            fileText.slice(0, startReplacementIndex),
+            `\n${transcription}`,
+            fileText.slice(startReplacementIndex),
+          ].join("");
+        }
+
+        //check if abortion signal is aborted
+
+        if (abortController?.signal?.aborted) {
+          new Notice(`Transcription of ${file.name} cancelled!`, 5 * 1000);
+          return;
+        }
+        await this.app.vault.modify(parent_file, fileText);
+      }
     } catch (error) {
       // First check if 402 is in the error message, if so alert the user that they need to pay
 
@@ -272,7 +280,7 @@ export default class CopilotPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       this.customCommandRegister.initialize().then(migrateCommands).then(suggestDefaultCommands);
     });
-  
+
     console.log("Loading Obsidian Transcription");
     if (this.asrSettings.Asr_debugMode) console.log("Debug mode enabled");
 
@@ -667,6 +675,7 @@ export default class CopilotPlugin extends Plugin {
     const leaves = this.app.workspace.getLeavesOfType(CHAT_VIEWTYPE);
     if (leaves.length === 0) {
       if (getSettings().defaultOpenArea === DEFAULT_OPEN_AREA.VIEW) {
+        // @ts-ignore
         await this.app.workspace.getRightLeaf(false).setViewState({
           type: CHAT_VIEWTYPE,
           active: true,
