@@ -110,8 +110,7 @@ export class TranscriptionEngine {
     const hasAudio = await hasAudioTrack(mp4File);
 
     if (!hasAudio) {
-      // alert("⚠️ 这个 mp4 文件没有音轨，无法上传！");
-      return Promise.reject("⚠️ 这个 mp4 文件没有音轨，无法上传！");
+      return Promise.reject("⚠️ 这个文件没有音轨，无法上传！");
     } else {
       console.log("✅ 检测到音轨，可以上传");
     }
