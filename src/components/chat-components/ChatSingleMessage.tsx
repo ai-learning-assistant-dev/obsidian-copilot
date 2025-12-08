@@ -6,13 +6,15 @@ import { USER_SENDER } from "@/constants";
 import { cn } from "@/lib/utils";
 import { ChatMessage } from "@/sharedState";
 import { insertIntoEditor } from "@/utils";
-import { Bot, User } from "lucide-react";
+import { Bot, User, Loader2, AlertCircle } from "lucide-react";
 import { App, Component, MarkdownRenderer, MarkdownView, TFile, Notice } from "obsidian";
 import { diffTrimmedLines, Change } from "diff";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSettingsValue } from "@/settings/model";
 import { createRoot, Root } from "react-dom/client";
 import { ComposerCodeBlock } from "./ComposerCodeBlock";
+import { parseAllImageSyntax, hasImageReferences } from "@/utils/imageParser";
+import { loadVaultImageWithCache } from "@/utils/imageLoader";
 
 function MessageContext({ context }: { context: ChatMessage["context"] }) {
   if (!context || (context.notes.length === 0 && context.urls.length === 0)) {
@@ -41,6 +43,224 @@ function MessageContext({ context }: { context: ChatMessage["context"] }) {
           <TooltipContent>{url}</TooltipContent>
         </Tooltip>
       ))}
+    </div>
+  );
+}
+
+/**
+ * 组件：渲染包含图片的 AI 消息
+ * 解析消息文本中的图片引用并显示图片
+ */
+function MessageWithImages({ 
+  text, 
+  app, 
+  contentRef 
+}: { 
+  text: string; 
+  app: App; 
+  contentRef: React.RefObject<HTMLDivElement>;
+}) {
+  const [parsedContent, setParsedContent] = useState<Array<{
+    type: 'text' | 'image';
+    content: string;
+    loading?: boolean;
+    error?: string;
+  }>>([]);
+
+  const textRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const componentsRef = useRef<Map<number, Component>>(new Map());
+
+  useEffect(() => {
+    const parseAndLoadImages = async () => {
+      // 解析图片引用
+      const imageRefs = parseAllImageSyntax(text);
+      
+      if (imageRefs.length === 0) {
+        // 没有图片，直接显示文本
+        setParsedContent([{ type: 'text', content: text }]);
+        return;
+      }
+
+      // 构建内容数组
+      const content: typeof parsedContent = [];
+      let lastIndex = 0;
+
+      for (const imgRef of imageRefs) {
+        // 添加图片前的文本
+        if (imgRef.startIndex > lastIndex) {
+          const textBefore = text.slice(lastIndex, imgRef.startIndex);
+          if (textBefore.trim()) {
+            content.push({ type: 'text', content: textBefore });
+          }
+        }
+
+        // 添加图片占位符（开始加载）
+        const imageIndex = content.length;
+        content.push({ 
+          type: 'image', 
+          content: imgRef.path,
+          loading: true 
+        });
+
+        // 异步加载图片
+        loadVaultImageWithCache(app, imgRef.path).then(result => {
+          setParsedContent(prev => {
+            const newContent = [...prev];
+            if (result.success && result.dataUrl) {
+              newContent[imageIndex] = {
+                type: 'image',
+                content: result.dataUrl,
+                loading: false,
+              };
+            } else {
+              newContent[imageIndex] = {
+                type: 'image',
+                content: imgRef.path,
+                loading: false,
+                error: result.error || 'Failed to load image',
+              };
+            }
+            return newContent;
+          });
+        }).catch(error => {
+          setParsedContent(prev => {
+            const newContent = [...prev];
+            newContent[imageIndex] = {
+              type: 'image',
+              content: imgRef.path,
+              loading: false,
+              error: error.message || 'Failed to load image',
+            };
+            return newContent;
+          });
+        });
+
+        lastIndex = imgRef.endIndex;
+      }
+
+      // 添加最后的文本
+      if (lastIndex < text.length) {
+        const textAfter = text.slice(lastIndex);
+        if (textAfter.trim()) {
+          content.push({ type: 'text', content: textAfter });
+        }
+      }
+
+      setParsedContent(content);
+    };
+
+    parseAndLoadImages();
+  }, [text, app]);
+
+  // 渲染文本内容到 DOM
+  useEffect(() => {
+    parsedContent.forEach((item, index) => {
+      if (item.type === 'text') {
+        const element = textRefs.current.get(index);
+        if (element) {
+          // 清空之前的内容
+          element.innerHTML = '';
+          
+          // 创建或重用 Component 实例
+          if (!componentsRef.current.has(index)) {
+            componentsRef.current.set(index, new Component());
+          }
+          const component = componentsRef.current.get(index)!;
+          
+          // 使用 Obsidian 的 MarkdownRenderer 渲染 Markdown
+          MarkdownRenderer.renderMarkdown(
+            item.content,
+            element,
+            '',
+            component
+          );
+        }
+      }
+    });
+
+    // 清理函数
+    return () => {
+      componentsRef.current.forEach(component => {
+        component.unload();
+      });
+      componentsRef.current.clear();
+    };
+  }, [parsedContent]);
+
+  // 渲染内容
+  return (
+    <div className="tw-flex tw-flex-col tw-gap-3">
+      {parsedContent.map((item, index) => {
+        if (item.type === 'text') {
+          // 文本内容 - 使用 Markdown 渲染
+          return (
+            <div 
+              key={index} 
+              ref={(el) => {
+                if (el) {
+                  textRefs.current.set(index, el);
+                  // 如果是第一个元素，也设置到外部 contentRef
+                  if (index === 0 && contentRef) {
+                    (contentRef as any).current = el;
+                  }
+                }
+              }}
+              className="message-text-content"
+            />
+          );
+        } else if (item.type === 'image') {
+          // 图片内容
+          if (item.loading) {
+            // 加载中
+            return (
+              <div 
+                key={index} 
+                className="tw-flex tw-items-center tw-gap-2 tw-rounded tw-border tw-border-border tw-bg-secondary tw-p-3"
+              >
+                <Loader2 className="tw-size-4 tw-animate-spin" />
+                <span className="tw-text-sm tw-text-muted">Loading image: {item.content}</span>
+              </div>
+            );
+          } else if (item.error) {
+            // 加载失败
+            return (
+              <div 
+                key={index} 
+                className="tw-flex tw-items-center tw-gap-2 tw-rounded tw-border tw-border-error tw-bg-error/10 tw-p-3"
+              >
+                <AlertCircle className="tw-size-4 tw-text-error" />
+                <div className="tw-flex tw-flex-col tw-gap-1">
+                  <span className="tw-text-sm tw-text-error">Failed to load image</span>
+                  <span className="tw-text-xs tw-text-muted">{item.content}</span>
+                  {item.error && (
+                    <span className="tw-text-xs tw-text-muted">{item.error}</span>
+                  )}
+                </div>
+              </div>
+            );
+          } else {
+            // 成功加载 - 显示图片
+            return (
+              <div 
+                key={index} 
+                className="message-image-content tw-max-w-full tw-overflow-hidden tw-rounded"
+              >
+                <img
+                  src={item.content}
+                  alt="Vault image"
+                  className="chat-message-image tw-max-w-full tw-cursor-pointer tw-rounded tw-transition-transform hover:tw-scale-[1.02]"
+                  onClick={() => {
+                    // TODO: 实现点击放大功能
+                    new Notice("Click to zoom (feature coming soon)");
+                  }}
+                  style={{ maxHeight: '400px', objectFit: 'contain' }}
+                />
+              </div>
+            );
+          }
+        }
+        return null;
+      })}
     </div>
   );
 }
@@ -618,7 +838,12 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
         {message.message}
       </div>
     ) : (
-      <div ref={contentRef} className={message.isErrorMessage ? "tw-text-error" : ""}></div>
+      // AI 消息：检查是否包含图片引用
+      hasImageReferences(message.message) ? (
+        <MessageWithImages text={message.message} app={app} contentRef={contentRef} />
+      ) : (
+        <div ref={contentRef} className={message.isErrorMessage ? "tw-text-error" : ""}></div>
+      )
     );
   };
 

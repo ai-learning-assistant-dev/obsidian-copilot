@@ -14,6 +14,9 @@ import { ToolManager } from "@/tools/toolManager";
 import { extractAllYoutubeUrls, extractChatHistory } from "@/utils";
 import { Vault } from "obsidian";
 import { BrevilabsClient } from "./brevilabsClient";
+import { getSettings } from "@/settings/model";
+import { WebSearchTool } from "@/tools/webSearchTool";
+import { Notice } from "obsidian";
 
 // TODO: Add @index with explicit pdf files in chat context menu
 export const COPILOT_TOOL_NAMES = ["@vault", "@composer", "@websearch", "@youtube", "@pomodoro"];
@@ -27,18 +30,24 @@ export class IntentAnalyzer {
   private static tools: any[] = [];
 
   static initTools(vault: Vault) {
-    if (this.tools.length === 0) {
-      this.tools = [
-        getCurrentTimeTool,
-        getTimeInfoByEpochTool,
-        getTimeRangeMsTool,
-        localSearchTool,
-        indexTool,
-        pomodoroTool,
-        webSearchTool,
-        simpleYoutubeTranscriptionTool,
-        createGetFileTreeTool(vault.getRoot()),
-      ];
+    const settings = getSettings();
+    new Notice(`Initializing tools. Web search enabled: ${settings.useWebSearch}`); // Pop-up
+    console.log(`IntentAnalyzer.initTools called. Web search should be: ${settings.useWebSearch}`); // Lognew Notice(`Initializing tools. Web search enabled: ${settings.useWebSearch}`); // Pop-up
+    // Always initialize with core tools
+    this.tools = [
+      getCurrentTimeTool,
+      getTimeInfoByEpochTool,
+      getTimeRangeMsTool,
+      localSearchTool,
+      indexTool,
+      pomodoroTool,
+      simpleYoutubeTranscriptionTool,
+      createGetFileTreeTool(vault.getRoot()),
+    ];
+
+    // Conditionally add the WebSearchTool
+    if (settings.useWebSearch) {
+      this.tools.push(new WebSearchTool());
     }
   }
 

@@ -31,6 +31,42 @@ export const AdvancedSettings: React.FC = () => {
 
           <SettingItem
             type="switch"
+            title="Enable Web Search"
+            description="Allow Copilot to search the web to answer questions."
+            checked={settings.useWebSearch}
+            onCheckedChange={(checked) => {
+              updateSetting("useWebSearch", checked);
+            }}
+          />
+
+          {settings.useWebSearch && (
+            <>
+              <SettingItem
+                type="select"
+                title="Search Engine Type"
+                description="Choose between free search (Baidu first, Bing fallback, no API key, works in China) or Zhipu AI (requires API key, better results)."
+                value={settings.searchEngineType || "free"}
+                onChange={(value) => updateSetting("searchEngineType", value as "zhipu" | "free")}
+                options={[
+                  { label: "Free Search (免费搜索 - 百度优先)", value: "free" },
+                  { label: "Zhipu AI (智谱AI - 需要API Key)", value: "zhipu" },
+                ]}
+              />
+
+              {settings.searchEngineType === "zhipu" && (
+                <SettingItem
+                  type="text"
+                  title="Zhipu API Key"
+                  description="API Key for Zhipu AI web search."
+                  value={settings.zhipuApiKey}
+                  onChange={(value) => updateSetting("zhipuApiKey", value)}
+                  placeholder="Enter your Zhipu API Key"
+                />
+              )}
+            </>
+          )}
+          <SettingItem
+            type="switch"
             title="Debug Mode"
             description="Debug mode will log some debug message to the console."
             checked={settings.debug}

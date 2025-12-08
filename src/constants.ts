@@ -26,7 +26,8 @@ export const DEFAULT_SYSTEM_PROMPT = `You are Obsidian Copilot, a helpful assist
   10. When generating a table, use compact formatting without excessive whitespace.
   11. Always respond in the language of the user's query.
   12. Do NOT mention the additional context provided such as getCurrentTime and getTimeRangeMs if it's irrelevant to the user message.
-  13. If the user mentions "tags", it most likely means tags in Obsidian note properties.`;
+  13. If the user mentions "tags", it most likely means tags in Obsidian note properties.
+  14. When the context includes an "Available Images" section with image references, you may reference those images in your response using ![[image-name.png]] syntax ONLY when it's directly relevant to answering the user's question. Do NOT add images just for decoration or casual responses. Only reference images that are actually listed in the available images context and only when the user is asking about images, visual content, or when an image would significantly enhance your explanation.`;
 
 export const COMPOSER_OUTPUT_INSTRUCTIONS = `Return the new note content or canvas JSON in a special JSON format.
 
@@ -712,6 +713,7 @@ export const DEFAULT_SETTINGS: CopilotSettings = {
   xaiApiKey: "",
   mistralApiKey: "",
   deepseekApiKey: "",
+  zhipuApiKey: "",
   defaultChainType: ChainType.LLM_CHAIN,
   defaultModelKey: ChatModels.GPT_41 + "|" + ChatModelProviders.OPENAI,
   embeddingModelKey: EmbeddingModels.OPENAI_EMBEDDING_SMALL + "|" + EmbeddingModelProviders.OPENAI,
@@ -736,6 +738,8 @@ export const DEFAULT_SETTINGS: CopilotSettings = {
   enableIndexSync: true,
   debug: false,
   enableEncryption: false,
+  useWebSearch: false,
+  searchEngineType: "free",
   maxSourceChunks: 3,
   groqApiKey: "",
   activeModels: BUILTIN_CHAT_MODELS,

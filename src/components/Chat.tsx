@@ -33,6 +33,7 @@ import {
 import SharedState, { ChatMessage, useSharedState } from "@/sharedState";
 import { FileParserManager } from "@/tools/FileParserManager";
 import { err2String, formatDateTime } from "@/utils";
+import { generateImageContext } from "@/utils/contextImageCollector";
 import { Buffer } from "buffer";
 import { Notice, TFile } from "obsidian";
 import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
@@ -216,12 +217,18 @@ const Chat: React.FC<ChatProps> = ({
     // Process selected text contexts
     const selectedTextContextAddition = contextProcessor.processSelectedTextContexts();
 
+    // Generate image context if there's an active note
+    const imageContextAddition = activeNote 
+      ? await generateImageContext(app, activeNote, true) 
+      : '';
+
     // Combine everything
     const finalProcessedMessage =
       processedUserMessage +
       urlContextAddition.urlContext +
       noteContextAddition +
-      selectedTextContextAddition;
+      selectedTextContextAddition +
+      imageContextAddition;
 
     let messageWithToolCalls = inputMessage;
     // Add tool calls last

@@ -36,6 +36,8 @@ import { Notice } from "obsidian";
 import ChainManager from "./chainManager";
 import { COPILOT_TOOL_NAMES, IntentAnalyzer } from "./intentAnalyzer";
 import ProjectManager from "./projectManager";
+import { WebSearchTool } from "@/tools/webSearchTool";
+import { FreeBingSearchTool } from "@/tools/freeBingSearchTool";
 
 class ThinkBlockStreamer {
   private hasOpenThinkBlock = false;
@@ -312,6 +314,164 @@ abstract class BaseChainRunner implements ChainRunner {
 }
 
 class LLMChainRunner extends BaseChainRunner {
+  /**
+   * 快速预过滤：对于明显的场景直接返回判断结果，无需调用 LLM
+   * 这可以减少 API 调用次数和成本
+   */
+  private quickSearchCheck(message: string): {
+    confident: boolean;
+    needsSearch: boolean;
+  } {
+    const query = message.toLowerCase();
+
+    // 100% 确定不需要搜索的场景
+    const definitelyNoSearch = [
+      /^(你好|嗨|hi|hello|嘿)/, // 问候
+      /^(谢谢|感谢|thanks|thank you)/, // 感谢
+      /^(再见|拜拜|bye|goodbye)/, // 告别
+      /(帮我|请|能否|可以)(写|创建|生成|制作)(?!.*搜索)/, // 内容创作
+      /写.*代码|创建.*函数|生成.*文件|编写.*程序/, // 代码相关
+      /(翻译|总结|解释|分析)(?!.*最新|.*今天)/, // 文本处理
+    ];
+
+    for (const pattern of definitelyNoSearch) {
+      if (pattern.test(query)) {
+        logInfo("Quick filter: Definitely NO search needed");
+        return { confident: true, needsSearch: false };
+      }
+    }
+
+    // 100% 确定需要搜索的场景
+    const definitelyNeedSearch = [
+      /@websearch|@web\b/, // 明确的搜索命令
+      /^(搜索|查找|查询|search|find)(?!.*文件|.*笔记)/, // 明确搜索意图
+      /今天.*天气|现在.*温度|当前.*气温/, // 实时天气
+      /现在.*价格|最新.*股价|当前.*汇率/, // 实时价格
+      /(今天|最新|最近).*新闻/, // 新闻资讯
+    ];
+
+    for (const pattern of definitelyNeedSearch) {
+      if (pattern.test(query)) {
+        logInfo("Quick filter: Definitely needs search");
+        return { confident: true, needsSearch: true };
+      }
+    }
+
+    // 不确定，需要 LLM 判断
+    return { confident: false, needsSearch: false };
+  }
+
+  /**
+   * 使用用户配置的 LLM 来判断是否需要网络搜索
+   * 这样可以利用用户已有的 API key，不需要额外配置
+   */
+  private async analyzeSearchIntentWithLLM(message: string): Promise<{
+    needsSearch: boolean;
+    searchQuery: string;
+  }> {
+    try {
+      const systemPrompt = `你是一个智能助手，负责判断用户的消息是否需要进行网络搜索。
+
+需要网络搜索的情况：
+1. 需要实时信息：天气、新闻、股价、汇率等
+2. 需要最新信息：最新版本、最新产品、最新发布等
+3. 需要验证的事实：具体数据、统计信息、官方信息等
+4. 用户明确要求搜索
+
+不需要网络搜索的情况：
+1. 问候、感谢、道别等社交对话
+2. 内容创作：写代码、写文章、生成内容等
+3. 文本处理：翻译、总结、解释、分析等
+4. 一般知识问答：你的知识库可以直接回答的问题
+5. 在本地笔记中搜索
+
+请分析用户消息，并以JSON格式返回：
+{
+  "needsSearch": true/false,
+  "searchQuery": "如果需要搜索，提供优化后的搜索关键词；否则为空字符串",
+  "reasoning": "简短说明判断理由（1-2句话）"
+}
+
+只返回JSON，不要有其他内容。`;
+
+      const userPrompt = `用户消息：${message}`;
+
+      logInfo("==== Analyzing search intent with user's LLM ====");
+
+      // 使用当前配置的 LLM 进行判断
+      const response = await this.chainManager.chatModelManager.getChatModel().invoke([
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ]);
+
+      const content = (response.content as string).trim();
+      logInfo("LLM search intent response:", content);
+
+      // 提取 JSON（可能被包裹在 markdown 代码块中）
+      let jsonStr = content;
+      const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1];
+      } else {
+        const directMatch = content.match(/\{[\s\S]*\}/);
+        if (directMatch) {
+          jsonStr = directMatch[0];
+        }
+      }
+
+      const result = JSON.parse(jsonStr);
+      logInfo("Parsed search intent:", result);
+
+      return {
+        needsSearch: result.needsSearch === true,
+        searchQuery: result.searchQuery || message,
+      };
+    } catch (error) {
+      logWarn("Failed to analyze search intent with LLM:", error);
+      // 降级到简单的本地规则
+      return this.fallbackSearchIntent(message);
+    }
+  }
+
+  /**
+   * 降级方案：当 LLM 分析失败时使用的简单本地规则
+   */
+  private fallbackSearchIntent(message: string): {
+    needsSearch: boolean;
+    searchQuery: string;
+  } {
+    const query = message.toLowerCase();
+
+    // 简单的关键词匹配
+    const searchKeywords = [
+      "今天",
+      "最新",
+      "现在",
+      "当前",
+      "天气",
+      "新闻",
+      "价格",
+      "股价",
+      "搜索",
+      "查找",
+      "查询",
+    ];
+
+    const hasSearchKeyword = searchKeywords.some((keyword) => query.includes(keyword));
+
+    // 排除创作类关键词
+    const createKeywords = ["写", "创建", "生成", "翻译", "总结"];
+    const isCreateRequest = createKeywords.some((keyword) => query.includes(keyword));
+
+    const needsSearch = hasSearchKeyword && !isCreateRequest;
+
+    logInfo(`Fallback search intent: ${needsSearch}`);
+    return {
+      needsSearch,
+      searchQuery: message,
+    };
+  }
+
   async run(
     userMessage: ChatMessage,
     abortController: AbortController,
@@ -324,8 +484,92 @@ class LLMChainRunner extends BaseChainRunner {
     }
   ): Promise<string> {
     const streamer = new ThinkBlockStreamer(updateCurrentAiMessage);
+    let searchSources: { title: string; score: number }[] = [];
 
     try {
+      let enhancedMessage = userMessage.message;
+
+      // 使用 LLM 智能判断是否需要网络搜索
+      if (getSettings().useWebSearch) {
+        try {
+          const messageForAnalysis = userMessage.originalMessage || userMessage.message;
+
+          // 第一步：快速过滤明显场景（节省 API 调用）
+          const quickCheck = this.quickSearchCheck(messageForAnalysis);
+
+          let needsWebSearch = false;
+          let searchQuery = messageForAnalysis;
+
+          if (quickCheck.confident) {
+            // 明显场景，直接使用快速判断结果
+            needsWebSearch = quickCheck.needsSearch;
+            logInfo(`Quick decision: needsSearch = ${needsWebSearch}`);
+          } else {
+            // 不确定的场景，使用 LLM 判断
+            logInfo("Uncertain case, analyzing with LLM...");
+            const intentResult = await this.analyzeSearchIntentWithLLM(messageForAnalysis);
+            needsWebSearch = intentResult.needsSearch;
+            searchQuery = intentResult.searchQuery;
+          }
+
+          // 如果需要搜索，执行网络搜索
+          if (needsWebSearch) {
+            const searchEngineType = getSettings().searchEngineType || "free";
+            const searchEngineName = searchEngineType === "zhipu" ? "智谱AI" : "免费搜索引擎";
+            new Notice(`正在使用${searchEngineName}进行网络搜索...`);
+            logInfo(
+              `==== Executing web search with ${searchEngineName} (${searchEngineType}), query: ${searchQuery} ====`
+            );
+
+            // 根据设置选择搜索工具
+            const searchTool =
+              searchEngineType === "zhipu" ? new WebSearchTool() : new FreeBingSearchTool();
+            const searchResults = await searchTool._call(searchQuery);
+
+            if (searchResults) {
+              logInfo("==== Web Search Results ====\n", searchResults);
+
+              // 解析搜索结果，提取来源信息
+              const sourceMatches = searchResults.matchAll(/Title: ([^\n]+)\nLink: ([^\n]+)/g);
+              searchSources = Array.from(sourceMatches).map((match, index) => ({
+                title: match[1],
+                score: 1.0 - index * 0.05, // 给来源一个递减的分数
+              }));
+
+              enhancedMessage = `
+基于以下网络搜索结果，请按照这个格式回答：
+
+1. 首先列出搜索来源（用 "## 🔍 搜索来源" 作为标题）
+2. 然后提供完整的回答
+
+网络搜索结果：
+---
+${searchResults}
+---
+
+用户的原始问题：
+"${userMessage.message}"
+
+请在回答开头列出搜索来源，格式如下：
+## 🔍 搜索来源
+- [来源标题1](链接1)
+- [来源标题2](链接2)
+...
+
+然后再提供详细回答。
+`;
+            }
+          }
+        } catch (error) {
+          console.error("Intent analysis or web search failed:", error);
+          logWarn("Falling back to direct LLM without web search");
+          // 失败时回退到原始消息，不影响正常聊天流程
+        }
+      }
+
+      // 使用增强后的消息（如果有搜索结果）或原始消息
+      const finalMessage = enhancedMessage;
+
       // Get chat history from memory
       const memory = this.chainManager.memoryManager.getMemory();
       const memoryVariables = await memory.loadMemoryVariables({});
@@ -350,10 +594,10 @@ class LLMChainRunner extends BaseChainRunner {
         messages.push({ role: entry.role, content: entry.content });
       }
 
-      // Add current user message
+      // Add current user message (使用增强后的消息)
       messages.push({
         role: "user",
-        content: userMessage.message,
+        content: finalMessage,
       });
 
       logInfo("==== Final Request to AI ====\n", messages);
@@ -396,7 +640,8 @@ class LLMChainRunner extends BaseChainRunner {
       userMessage,
       abortController,
       addMessage,
-      updateCurrentAiMessage
+      updateCurrentAiMessage,
+      searchSources.length > 0 ? searchSources : undefined
     );
   }
 }

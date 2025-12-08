@@ -209,11 +209,15 @@ export default class CopilotPlugin extends Plugin {
   async onload(): Promise<void> {
     await this.loadSettings();
     this.settingsUnsubscriber = subscribeToSettingsChange(async (prev, next) => {
+      new Notice("Settings have changed!"); // This will pop up in Obsidian
+      console.log("Settings changed. Re-initializing tools.", { useWebSearch: next.useWebSearch }); // This will log to the console
       if (next.enableEncryption) {
         await this.saveData(await encryptAllKeys(next));
       } else {
         await this.saveData(next);
       }
+      // Re-initialize tools when settings change.
+      IntentAnalyzer.initTools(this.app.vault);
       registerCommands(this, prev, next);
     });
     this.addSettingTab(new CopilotSettingTab(this.app, this));

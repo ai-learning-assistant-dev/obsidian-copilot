@@ -81,6 +81,7 @@ export interface CopilotSettings {
   xaiApiKey: string;
   mistralApiKey: string;
   deepseekApiKey: string;
+  zhipuApiKey: string;
   defaultChainType: ChainType;
   defaultModelKey: string;
   embeddingModelKey: string;
@@ -104,6 +105,8 @@ export interface CopilotSettings {
   enableIndexSync: boolean;
   debug: boolean;
   enableEncryption: boolean;
+  useWebSearch: boolean;
+  searchEngineType: "zhipu" | "free"; // 搜索引擎类型：智谱AI或免费搜索
   maxSourceChunks: number;
   qaExclusions: string;
   qaInclusions: string;
