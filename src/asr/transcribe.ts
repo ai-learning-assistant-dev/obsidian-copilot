@@ -104,6 +104,17 @@ export class TranscriptionEngine {
   }
 
   async getTranscriptionWhisperASR(file: TFile): Promise<string> {
+    const arrayBuffer = await this.vault.readBinary(file);
+    // 包装成 File，带上文件名和 MIME type
+    const mp4File = new File([arrayBuffer], file.name, { type: "video/mp4" });
+    const hasAudio = await hasAudioTrack(mp4File);
+
+    if (!hasAudio) {
+      return Promise.reject("⚠️ 这个文件没有音轨，无法上传！");
+    } else {
+      console.log("✅ 检测到音轨，可以上传");
+    }
+
     const payload_data: PayloadData = {};
     payload_data["audio_file"] = new Blob([await this.vault.readBinary(file)]);
     const [request_body, boundary_string] = await payloadGenerator(payload_data);
@@ -117,7 +128,8 @@ export class TranscriptionEngine {
     if (Asr_language !== DEFAULT_SETTINGS.Asr_language) args += `&language=${Asr_language}`;
 
     // 修复：确保 Asr_localServiceUrl 存在且为字符串，如果不存在则使用默认值
-    const localServiceUrl = this.plugin.asrSettings.Asr_localServiceUrl || DEFAULT_SETTINGS.Asr_localServiceUrl;
+    const localServiceUrl =
+      this.plugin.asrSettings.Asr_localServiceUrl || DEFAULT_SETTINGS.Asr_localServiceUrl;
     const urls = localServiceUrl.split(";").filter(Boolean);
     // const urls = this.plugin.asrSettings.Asr_localServiceUrl.split(";").filter(Boolean); // Remove empty strings
 
@@ -206,5 +218,26 @@ export class TranscriptionEngine {
     }
     // If all URLs fail, reject the promise with a generic error or the last specific error caught
     return Promise.reject("All Whisper ASR URLs failed");
+  }
+}
+/**
+ * 检测 mp4 文件是否包含音轨（基于 AudioContext 解码）
+ * @param file File | Blob
+ * @returns Promise<boolean>
+ */
+export async function hasAudioTrack(file: File | Blob): Promise<boolean> {
+  const arrayBuffer = await file.arrayBuffer();
+  const audioContext = new AudioContext();
+
+  try {
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+    // 如果解码成功并且有声道，就说明有音轨
+    return audioBuffer.numberOfChannels > 0;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (err) {
+    // decodeAudioData 失败说明没有可解码的音频轨道
+    return false;
+  } finally {
+    audioContext.close();
   }
 }
